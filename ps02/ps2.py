@@ -56,14 +56,18 @@ def get_center(circles, minx, maxx):
 
 
 def get_light_color(img, centers):
-    print(centers)
     r = (centers[:, 2] / 4).astype(int)
-    red = np.mean(img[centers[0][1] - r[0]:centers[0][1] + r[0], centers[0][0] - r[0]:centers[0][0] + r[0], 2])
-    yellow = np.mean(img[centers[1][1] - r[1]:centers[1][1] + r[1], centers[1][0] - r[1]:centers[1][0] + r[1], 1:])
+    x, y = img.shape[:2]
+    red = np.mean(img[centers[0][1] - r[0]:centers[0][1] + r[0],
+                  centers[0][0] - r[0]:centers[0][0] + r[0],
+                  2])
+    yellow = np.mean(img[centers[1][1] - r[1]:centers[1][1] + r[1],
+                     centers[1][0] - r[1]:centers[1][0] + r[1],
+                     1:])
     green = np.mean(
-        img[centers[2][1] - r[2]:centers[2][1] + r[2], centers[2][0] - r[2]:centers[2][0] + r[2], 1])
-    print("{}  {}  {}".format(red, yellow, green))
-    #
+        img[centers[2][1] - r[2]:centers[2][1] + r[2],
+        centers[2][0] - r[2]:centers[2][0] + r[2],
+        1])
     colors = ["red", "yellow", "green"]
     color = colors[np.argmax([red, yellow, green])]
     return color
@@ -85,90 +89,46 @@ def filter_angles(lines, angles):
     return lines_filtered
 
 
-def get_midpt(line):
-    print(line)
-    x1,y1 = line[0],line[1]
-    x2, y2 = line[2], line[3]
-    return [(x1+x2)/2,(y1+y2)/2]
+def proximal_pts(p1, p2, threshold):
+    if (abs(p1[0]-p2[0]) < threshold and abs(p1[1]-p2[1]) < threshold):
+        return True
+    else:
+        return False
 
-def get_length(line):
-    x1, y1 = line[0], line[1]
-    x2, y2 = line[2], line[3]
-    length = math.sqrt(abs(x1-x2)**2 + abs(y1-y2)**2)
-    return length
 
-def get_centers(lines):
-    m = 0
-    l1m = None
-    l2m = None
-    for l1 in lines:
-        for l2 in lines:
-            if tuple(l1) == tuple(l2):
-                continue
-            l1c = get_midpt(l1)
-            l2c = get_midpt(l2)
-            distance = get_length([l1c[0],l1c[1],l2c[0],l2c[1]])
-            if m < distance:
-                m = distance
-                l1m = l1
-                l2m = l2
-    l1c = get_midpt(l1m)
-    l2c = get_midpt(l2m)
-    center = get_midpt([l1c[0],l1c[1],l2c[0],l2c[1]])
-    return center
+def get_diamonds(lines):
+    l45 = filter_angles(lines, [45])
+    l_45 = filter_angles(lines, [-45])
 
-def get_square_centers(lines):
-    # filter lines with +45 and -45 angles
-    side_45 = filter_angles(lines, [45])
-    side__45 = filter_angles(lines, [-45])
+    diamonds = []
 
-    # list of set of square lines
-    squares = []
-    for line1 in side_45:
-        l1c = get_midpt(line1)
-        for line2 in side__45:
-            l2c = get_midpt(line2)
-            """
-            if both lines are almost same length and 
-            either their mid point x values or mid point y values are approximately the same
-            then they belong to the same set of square
-            """
-            if ((abs(get_length(line1) - get_length(line2)) < 3)
-                    and ((abs(l1c[0] - l2c[0]) < 3) or (abs(l1c[1] - l2c[1]) < 3))):
-                placed = False
-                l1 = tuple(line1)
-                l2 = tuple(line2)
-                if len(squares) != 0:
-                    for square in squares:
-                        if l1 in square or l2 in square:
-                            square.add(l1)
-                            square.add(l2)
-                            placed = True
-                if not placed:
-                    square = set({l1, l2})
-                    squares.append(square)
+    for l1 in l45:
+        common = []
+        p1 = (l1[0], l1[1])
+        p2 = (l1[2], l1[3])
+        for l2 in l_45:
+            p3 = (l2[0], l2[1])
+            p4 = (l2[2], l2[3])
+            for pin1 in [p1, p2]:
+                for pin2 in [p3, p4]:
+                    # print("{} {} {} {}".format(pin1, pin2, abs(pin1[0]-pin2[0]), abs(pin1[1]-pin2[1])))
+                    if proximal_pts(pin1, pin2, 10):
+                        common = [(pin1[0] + pin2[0]) / 2, (pin1[1] + pin2[1]) / 2]
+                        placed = False
+                        l1t = tuple(l1)
+                        l2t = tuple(l2)
+                        ct = tuple(common)
+                        for diamond in diamonds:
+                            if l1t in diamond["lines"] or l2t in diamond["lines"]:
+                                diamond["lines"].add(l1t)
+                                diamond["lines"].add(l2t)
+                                diamond["common"].add(ct)
+                                placed = True
+                        if not placed:
+                            diamond = {"lines": set([l1t, l2t]), "common": set({ct})}
+                            diamonds.append(diamond)
+    return diamonds
 
-    print(squares)
-
-    centers = []
-
-    for square in squares:
-        """
-        get lines of same angle, get their mid points and the midpoint of these midpoints
-        from the two groups, find mid-mid point
-        """
-        # lines = [np.array(line) for line in list(square)]
-        # side45 = filter_angles(lines, [45])
-        # side_45 = filter_angles(lines, [-45])
-        # # c = np.array([get_centers(side45), get_centers(side_45)])
-        # center = np.mean(c, axis=1)
-        # centers.append(center)
-
-        d = []
-        for i in range(4):
-            d.append(np.mean([c[i] for c in list(square)]))
-        return ((d[0]+d[2])/2,(d[1]+d[3])/2)
-    #return centers
 
 def traffic_light_detection(img_in, radii_range):
     """Finds the coordinates of a traffic light image given a radii
@@ -210,7 +170,7 @@ def traffic_light_detection(img_in, radii_range):
 
     # edges of traffic light
     edges = cv2.Canny(tl, 100, 200)
-    # show_img("edges of image", edges)
+    #show_img("edges of image", edges)
 
     # get all lines using Hough Transform
     lines = cv2.HoughLines(edges, 1, np.pi / 180, 100)
@@ -220,15 +180,20 @@ def traffic_light_detection(img_in, radii_range):
 
     # get x axis of the vertical lines
     xmin, xmax = get_vertical(lines)
-    print(radii_range)
+    if xmin == xmax:
+        if xmin < 100:
+            xmin = 0
+        else:
+            xmax = tl.shape[1]
+
     circles = cv2.HoughCircles(edges, cv2.HOUGH_GRADIENT, 1, 20,
                                param1=15, param2=20,
                                minRadius=max(5, min(radii_range) - 5), maxRadius=min(50, max(radii_range) + 10))
 
     if circles is not None:
         circles = np.uint16(np.around(circles))
-        # draw_circles(circles, tl)
-        # show_img("lines and circles", tl)
+        #draw_circles(circles, tl)
+        #show_img("lines and circles", tl)
 
         cshape = circles.shape
         centers = circles.reshape(cshape[1], cshape[2])
@@ -321,30 +286,27 @@ def warning_sign_detection(img_in):
         (x,y) tuple of the coordinates of the center of the sign.
     """
     sign_draw = img_in.copy()
-    # show_img("sample tl", tl)
 
-    # gray_img = cv2.cvtColor(sign, cv2.COLOR_BGR2GRAY)
-    # blured = cv2.GaussianBlur(gray_img, (5,5),2)
-    # edges_blur = cv2.Canny(blured, 5, 10)
-    # show_img("blurred edges", edges_blur)
-
-    # check how canny edge filter shows up)
     edges = cv2.Canny(sign_draw, 100, 200)
-    # show_img("edges of tl", edges)
 
     lines = cv2.HoughLinesP(edges, rho=1, theta=np.pi / 36, threshold=20, minLineLength=5, maxLineGap=5)
     lines = lines.reshape(lines.shape[0], lines.shape[2])
 
-    centers = get_square_centers(lines)
+    diamonds = get_diamonds(lines)
+    if len(diamonds) == 0:
+        return 0, 0
 
-    for center in centers:
-        area = sign_draw[int(center[0]) - 5:int(center[0]) + 5, int(center[1]) - 5:int(center[1]) + 5]
+    for diamond in diamonds:
+        centerx = np.mean([c[0] for c in diamond["common"]])
+        centery = np.mean([c[1] for c in diamond["common"]])
+        area = sign_draw[int(centery) - 5:int(centery) + 5, int(centerx) - 5:int(centerx) + 5]
         red = np.mean(area[:, :, 2])
         green = np.mean(area[:, :, 1])
-
+        #print("{} {}".format(red, green))
         if red > 200 and green > 200:
-            return int(center[0]), int(center[1])
-    return int(center[0]), int(center[1])
+            return int(centerx), int(centery)
+
+    return 0, 0
 
 
 def construction_sign_detection(img_in):
@@ -357,7 +319,28 @@ def construction_sign_detection(img_in):
     Returns:
         (x,y) tuple of the coordinates of the center of the sign.
     """
-    raise NotImplementedError
+    sign_draw = img_in.copy()
+
+    edges = cv2.Canny(sign_draw, 100, 200)
+
+    lines = cv2.HoughLinesP(edges, rho=1, theta=np.pi / 36, threshold=20, minLineLength=5, maxLineGap=5)
+    lines = lines.reshape(lines.shape[0], lines.shape[2])
+
+    diamonds = get_diamonds(lines)
+    if len(diamonds) == 0:
+        return 0, 0
+
+    for diamond in diamonds:
+        centerx = np.mean([c[0] for c in diamond["common"]])
+        centery = np.mean([c[1] for c in diamond["common"]])
+        area = sign_draw[int(centery) - 5:int(centery) + 5, int(centerx) - 5:int(centerx) + 5]
+        red = np.mean(area[:, :, 2])
+        green = np.mean(area[:, :, 1])
+        #print("{} {}".format(red, green))
+        if red > 200 and 100 < green < 200:
+            return int(centerx), int(centery)
+
+    return 0, 0
 
 
 def do_not_enter_sign_detection(img_in):
