@@ -45,8 +45,19 @@ def get_center(circles, minx, maxx):
     centerxy = cr[0:2,cr[1,:]==center].reshape(2)
     return centerxy
 
+def draw_tl_center(image_in, center, state):
+    img = image_in.copy()
+    x,y=int(center[0]), int(center[1])
+    text = "(({},{}),'{}')".format(x,y, state)
+    xs, ys = image_in.shape[0], image_in.shape[1]
+    orgx = x+50 if x+50+200<xs else x-200
+    orgy = y
+    cv2.putText(img, text, (orgx,orgy), cv2.FONT_HERSHEY_SIMPLEX, .5,(0,0,0))
+    cv2.putText(img,"*",(x-8, y+9), cv2.FONT_HERSHEY_SIMPLEX,1,(0,0,255), thickness=2)
+    return img
 
-tl = cv2.imread("input_images\\simple_tl.png")
+
+tl = cv2.imread("input_images\\scene_tl_1.png")
 tl_draw = copy.deepcopy(tl)
 #show_img("sample tl", tl)
 
@@ -76,27 +87,35 @@ then find the three circles in between those two x values, and identify the circ
 """
 
 circles = cv2.HoughCircles(edges, cv2.HOUGH_GRADIENT, 1, 20,
-                          param1=50, param2=30,
-                          minRadius=5, maxRadius=50)
+                          param1=15, param2=20,
+                          minRadius=5, maxRadius=40)
 if circles is not None:
     circles = np.uint16(np.around(circles))
     draw_circles(circles, tl_draw)
-    print(circles)
-    cshape = circles.shape
-    cr = circles.reshape(cshape[1], cshape[2])
-    cr = cr[(cr[:, 0] > xmin) * (cr[:, 0] < xmax), 0:2]
-    for circle in cr:
-        row = int(circle[0])
-        col = int(circle[1])
-        if tl[row, col, :][2] == tl[row,col,:][1] and tl[row,col,:][2] > 250: color = 'yellow'
-        elif tl[row, col, :][2] > 250 and tl[row, col, :][1] < 200: color = 'red'
-        elif tl[row, col, :][1] > 250 and tl[row, col, :][2] < 200: color = 'green'
-
     #show_img("lines and circles", tl_draw)
+    cshape = circles.shape
+    centers = circles.reshape(cshape[1], cshape[2])
+    centers = centers[(centers[:, 0] > xmin) * (centers[:, 0] < xmax), :]
+    sorted(centers, key=lambda x:x[1])
+    print(centers)
+    r = (centers[:,2]/4).astype(int)
+    red = np.mean(tl[centers[0][1]-r[0]:centers[0][1]+r[0], centers[0][0]-r[0]:centers[0][0]+r[0], 2])
+    yellow = np.mean(tl[centers[1][1] - r[1]:centers[1][1] + r[1], centers[1][0] - r[1]:centers[1][0] + r[1], 1:])
+    green = np.mean(
+         tl[centers[2][1] - r[2]:centers[2][1] + r[2], centers[2][0] - r[2]:centers[2][0] + r[2], 1])
+    print("{}  {}  {}".format(red, yellow, green))
+    #
+    colors = ["red","yellow","green"]
+    color = colors[np.argmax([red, yellow, green])]
+    # c1 = tl_gray[centers[0][0],centers[0][1]]
+    # c2 = tl_gray[centers[1][0], centers[1][1]]
+    # c3 = tl_gray[centers[2][0], centers[2][1]]
+
+
+
     center_tl = get_center(circles, xmin,xmax)
-
-
-
+    tl_draw = draw_tl_center(tl, (center_tl[0],center_tl[1]), color)
+    show_img("lines and circles", tl_draw)
 
 
 cv2.destroyAllWindows()

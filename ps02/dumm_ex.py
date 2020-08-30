@@ -38,16 +38,18 @@ def draw_tl_center(image_in, center, state):
         traffic light center and text that presents the numerical
         coordinates with the traffic light state.
     """
-    img = image_in.copy()
-    x,y=int(center[0]), int(center[1])
-    text = "(({},{}),'{}')".format(x,y, state)
-    xs, ys = image_in.shape[0], image_in.shape[1]
-    orgx = x+50 if x+50+200<xs else x-200
-    orgy = y
-    cv2.putText(img, text, (orgx,orgy), cv2.FONT_HERSHEY_SIMPLEX, .5,(0,0,0))
-    cv2.putText(img,"*",(x-8, y+9), cv2.FONT_HERSHEY_SIMPLEX,1,(0,0,255), thickness=2)
-    return img
+    new_img = image_in.copy()
+    text = "(({}, {}), '{}')".format(center[0], center[1], state)
+    x, y = center
+    org = (x+50 if x+50+200 < image_in.shape[1] else x-200, y)
+    cv2.putText(new_img, text, org, cv2.FONT_HERSHEY_SIMPLEX, .5, (0,0,0))
+    cv2.putText(new_img, '*', (x-15, y+18), cv2.FONT_HERSHEY_SIMPLEX, 2, (0,0,255), thickness=2)
 
+    return new_img
+
+def show_img (img):
+    cv2.imshow("D", img)
+    cv2.waitKey(0)
 
 def mark_traffic_signs(image_in, signs_dict):
     """Marks the center of a traffic sign and adds its coordinates.
@@ -71,24 +73,21 @@ def mark_traffic_signs(image_in, signs_dict):
         numpy.array: output image showing markers on each traffic
         sign.
     """
-    img = image_in.copy()
+    new_img = image_in.copy()
     for sign_name, center in signs_dict.items():
-        x, y = int(center[0]), int(center[1])
-        text = "(({},{}),'{}')".format(x, y, sign_name)
-        xs, ys = image_in.shape[0], image_in.shape[1]
-        orgx = x + 50 if x + 50 + 200 < xs else x - 200
-        orgy = y
-        cv2.putText(img, text, (orgx, orgy), cv2.FONT_HERSHEY_SIMPLEX, .5, (0, 0, 0))
-        cv2.putText(img, "*", (x - 8, y + 9), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), thickness=2)
-    return img
+        text = "{}:({}, {})".format(sign_name, center[0], center[1])
+        x, y = center
+        org = (x + 50 if x + 50 + 200 < image_in.shape[1] else x - 200, y)
+        cv2.putText(new_img, text, org, cv2.FONT_HERSHEY_SIMPLEX, .5, (0, 0, 0))
+        cv2.putText(new_img, '*', (x - 15, y + 18), cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 0, 0), thickness=2)
+    show_img(new_img)
+    return new_img
 
 
 def part_1():
 
     input_images = ['simple_tl', 'scene_tl_1', 'scene_tl_2', 'scene_tl_3']
     output_labels = ['ps2-1-a-1', 'ps2-1-a-2', 'ps2-1-a-3', 'ps2-1-a-4']
-    input_images = [ 'scene_tl_1']
-    output_labels = ['ps2-1-a-2']
 
     # Define a radii range, you may define a smaller range based on your
     # observations.
@@ -100,7 +99,7 @@ def part_1():
         coords, state = ps2.traffic_light_detection(tl, radii_range)
 
         img_out = draw_tl_center(tl, coords, state)
-        cv2.imwrite("{}.png".format(label), img_out)
+        cv2.imwrite("output/{}.png".format(label), img_out)
 
 
 def part_2():
@@ -117,14 +116,6 @@ def part_2():
 
     sign_labels = ['no_entry', 'stop', 'construction', 'warning', 'yield']
 
-    # input_images = ['scene_yld_1']
-    #
-    # output_labels = ['ps2-2-a-5']
-    #
-    # sign_fns = [ps2.yield_sign_detection]
-    #
-    # sign_labels = ['yield']
-
     for img_in, label, fn, name in zip(input_images, output_labels, sign_fns,
                                        sign_labels):
 
@@ -134,6 +125,7 @@ def part_2():
         temp_dict = {name: coords}
         img_out = mark_traffic_signs(sign_img, temp_dict)
         cv2.imwrite("{}.png".format(label), img_out)
+    print("I AM RUNNNG")
 
 
 def part_3():
@@ -147,7 +139,7 @@ def part_3():
         coords = ps2.traffic_sign_detection(scene)
 
         img_out = mark_traffic_signs(scene, coords)
-        cv2.imwrite("{}.png".format(label), img_out)
+        cv2.imwrite("output/{}.png".format(label), img_out)
 
 
 def part_4():
@@ -159,7 +151,7 @@ def part_4():
         coords = ps2.traffic_sign_detection_noisy(scene)
 
         img_out = mark_traffic_signs(scene, coords)
-        cv2.imwrite("{}.png".format(label), img_out)
+        cv2.imwrite("output/{}.png".format(label), img_out)
 
 
 def part_5a():
@@ -171,7 +163,7 @@ def part_5a():
         coords = ps2.traffic_sign_detection_challenge(scene)
 
         img_out = mark_traffic_signs(scene, coords)
-        cv2.imwrite("{}.png".format(label), img_out)
+        cv2.imwrite("output/{}.png".format(label), img_out)
 
 
 def part_5b():
@@ -183,12 +175,12 @@ def part_5b():
         coords = ps2.traffic_sign_detection_challenge(scene)
 
         img_out = mark_traffic_signs(scene, coords)
-        cv2.imwrite("{}.png".format(label), img_out)
+        cv2.imwrite("output/{}.png".format(label), img_out)
 
 if __name__ == '__main__':
-    #part_1()
+    # part_1()
     part_2()
-    #part_3()
-    #part_4()
-    #part_5a()
-    #part_5b()
+    # part_3()
+    # part_4()
+    # part_5a()
+    # part_5b()
