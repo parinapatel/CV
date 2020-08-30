@@ -8,7 +8,7 @@ implementation and output images so you can verify your results.
 
 import cv2
 
-import dummy as ps2
+import ps2
 
 
 def draw_tl_center(image_in, center, state):
@@ -42,7 +42,8 @@ def draw_tl_center(image_in, center, state):
     x,y=int(center[0]), int(center[1])
     text = "(({},{}),'{}')".format(x,y, state)
     xs, ys = image_in.shape[0], image_in.shape[1]
-    orgx = x+50 if x+50+200<xs else x-200
+    #orgx = x+50 if x+50+200<xs else x-10
+    orgx = x + 50
     orgy = y
     cv2.putText(img, text, (orgx,orgy), cv2.FONT_HERSHEY_SIMPLEX, .5,(0,0,0))
     cv2.putText(img,"*",(x-8, y+9), cv2.FONT_HERSHEY_SIMPLEX,1,(0,0,255), thickness=2)
@@ -85,10 +86,10 @@ def mark_traffic_signs(image_in, signs_dict):
 
 def part_1():
 
-    input_images = ['simple_tl', 'scene_tl_1', 'scene_tl_2', 'scene_tl_3']
-    output_labels = ['ps2-1-a-1', 'ps2-1-a-2', 'ps2-1-a-3', 'ps2-1-a-4']
-    input_images = [ 'scene_tl_1']
-    output_labels = ['ps2-1-a-2']
+    #input_images = ['simple_tl', 'scene_tl_1', 'scene_tl_2', 'scene_tl_3']
+    #output_labels = ['ps2-1-a-1', 'ps2-1-a-2', 'ps2-1-a-3', 'ps2-1-a-4']
+    input_images = ['/test_images/simple_tl_test']
+    output_labels = ['temp']
 
     # Define a radii range, you may define a smaller range based on your
     # observations.
@@ -117,13 +118,13 @@ def part_2():
 
     sign_labels = ['no_entry', 'stop', 'construction', 'warning', 'yield']
 
-    # input_images = ['scene_yld_1']
-    #
-    # output_labels = ['ps2-2-a-5']
-    #
-    # sign_fns = [ps2.yield_sign_detection]
-    #
-    # sign_labels = ['yield']
+    input_images = ['scene_wrng_1', 'scene_yld_1']
+
+    output_labels = ['ps2-2-a-4','ps2-2-a-5']
+
+    sign_fns = [ps2.warning_sign_detection, ps2.yield_sign_detection]
+
+    sign_labels = ['warning', 'yield']
 
     for img_in, label, fn, name in zip(input_images, output_labels, sign_fns,
                                        sign_labels):

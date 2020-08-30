@@ -23,27 +23,6 @@ def filter_angles(lines, angles):
 
 
 def mark_traffic_signs(image_in, signs_dict):
-    """Marks the center of a traffic sign and adds its coordinates.
-
-    This function uses a dictionary that follows the following
-    structure:
-    {'sign_name_1': (x, y), 'sign_name_2': (x, y), etc.}
-
-    Where 'sign_name' can be: 'stop', 'no_entry', 'yield',
-    'construction', 'warning', and 'traffic_light'.
-
-    Use cv2.putText to place the coordinate values in the output
-    image.
-
-    Args:
-        image_in (numpy.array): the image to draw on.
-        signs_dict (dict): dictionary containing the coordinates of
-        each sign found in a scene.
-
-    Returns:
-        numpy.array: output image showing markers on each traffic
-        sign.
-    """
     img = image_in.copy()
     for sign_name, center in signs_dict.items():
         x, y = int(center[0]), int(center[1])
@@ -56,32 +35,6 @@ def mark_traffic_signs(image_in, signs_dict):
     return img
 
 def draw_tl_center(image_in, center, state):
-    """Marks the center of a traffic light image and adds coordinates
-    with the state of the current image
-
-    Use OpenCV drawing functions to place a marker that represents the
-    traffic light center. Additionally, place text using OpenCV tools
-    that show the numerical and string values of the traffic light
-    center and state. Use the following format:
-
-        ((x-coordinate, y-coordinate), 'color')
-
-    See OpenCV's drawing functions:
-    http://docs.opencv.org/2.4/modules/core/doc/drawing_functions.html
-
-    Make sure the font size is large enough so that the text in the
-    output image is legible.
-    Args:
-        image_in (numpy.array): input image.
-        center (tuple): center numeric values.
-        state (str): traffic light state values can be: 'red',
-                     'yellow', 'green'.
-
-    Returns:
-        numpy.array: output image showing a marker representing the
-        traffic light center and text that presents the numerical
-        coordinates with the traffic light state.
-    """
     img = image_in.copy()
     x,y=int(center[0]), int(center[1])
     text = "(({},{}),'{}')".format(x,y, state)
@@ -187,8 +140,58 @@ def get_square_centers(lines):
         # centers.append(center)
     return centers
 
-sign = cv2.imread("input_images\\scene_wrng_1.png")
-sign = cv2.imread("input_images\\scene_all_signs.png")
+def proximal_pts(p1, p2, threshold):
+    if (abs(p1[0]-p2[0]) < threshold and abs(p1[1]-p2[1]) < threshold):
+        return True
+    else:
+        return False
+
+def get_diamonds(lines):
+    l45 = filter_angles(lines, [45])
+    l_45 = filter_angles(lines, [-45])
+
+    diamonds = []
+
+    for l1 in l45:
+        common = []
+        p1 = (l1[0], l1[1])
+        p2 = (l1[2], l1[3])
+        for l2 in l_45:
+            p3 = (l2[0], l2[1])
+            p4 = (l2[2], l2[3])
+            for pin1 in [p1, p2]:
+                for pin2 in [p3, p4]:
+                    # print("{} {} {} {}".format(pin1, pin2, abs(pin1[0]-pin2[0]), abs(pin1[1]-pin2[1])))
+                    if proximal_pts(pin1, pin2, 10):
+                        common = [(pin1[0] + pin2[0]) / 2, (pin1[1] + pin2[1]) / 2]
+                        placed = False
+                        l1t = tuple(l1)
+                        l2t = tuple(l2)
+                        ct = tuple(common)
+                        for diamond in diamonds:
+                            if l1t in diamond["lines"] or l2t in diamond["lines"]:
+                                diamond["lines"].add(l1t)
+                                diamond["lines"].add(l2t)
+                                diamond["common"].add(ct)
+                                placed = True
+                        if not placed:
+                            diamond = {"lines": set([l1t, l2t]), "common": set({ct})}
+                            diamonds.append(diamond)
+    return diamonds
+
+
+def draw_circles(circles, img):
+    for i in circles[0, :]:
+        center = (i[0], i[1])
+        # circle center
+        cv2.circle(img, center, 1, (0, 100, 100), 3)
+        # circle outline
+        radius = i[2]
+        cv2.circle(img, center, radius, (255, 0, 255), 3)
+
+
+sign = cv2.imread("input_images\\scene_dne_1.png")
+#sign = cv2.imread("input_images\\scene_all_signs.png")
 
 sign_draw = copy.deepcopy(sign)
 #show_img("sample tl", tl)
@@ -200,28 +203,67 @@ sign_draw = copy.deepcopy(sign)
 
 #check how canny edge filter shows up)
 edges = cv2.Canny(sign_draw, 100, 200)
-show_img("edges of tl", edges)
+#show_img("edges of tl", edges)
 
 lines = cv2.HoughLinesP(edges, rho=1, theta = np.pi/36, threshold=20, minLineLength=5, maxLineGap=5)
 lines = lines.reshape(lines.shape[0], lines.shape[2])
 
-centers = get_square_centers(lines)
+circles = cv2.HoughCircles(edges, cv2.HOUGH_GRADIENT, 1, 20,
+                               param1=15, param2=20,
+                               minRadius=5, maxRadius=50)
 
-for center in centers:
-    area = sign_draw[int(center[0])-5:int(center[0])+5, int(center[1])-5:int(center[1]) +5]
-    red = np.mean(area[:,:,2])
-    green = np.mean(area[:,:,1])
-    cv2.putText(sign_draw, "*", (int(center[1]),int(center[0])), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), thickness=2)
-    show_img("sign",sign_draw)
-    print(red)
-    print(green)
-    if red > 200 and green > 200:
-        print("warning")
+for line in lines:
+    cv2.line(sign_draw, (line[0], line[1]), (line[2], line[3]), (0,0,0), 2)
+
+show_img("lines and circles", sign_draw)
+# if circles is not None:
+#     circles = np.uint16(np.around(circles))
+#     draw_circles(circles, sign_draw)
+#     show_img("lines and circles", sign_draw)
 
 
-print(centers)
-#print("{} {}".format(x,y))
+
+"""for construction and warning
+# for diamond in diamonds:
+#     print("lines: {} \n common: {}".format(diamond["lines"], diamond["common"]))
+#     for point in diamond["common"]:
+#         cv2.putText(sign_draw, "*", (int(point[0]), int(point[1])), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255),
+#                     thickness=2)
+#     show_img("",sign_draw)
+# diamonds = get_diamonds(lines)
+#
+# for diamond in diamonds:
+#     centerx = np.mean([c[0] for c in diamond["common"]])
+#     centery = np.mean([c[1] for c in diamond["common"]])
+#     area = sign_draw[int(centery) - 5:int(centery) + 5, int(centerx) - 5:int(centerx) + 5]
+#     red = np.mean(area[:, :, 2])
+#     green = np.mean(area[:, :, 1])
+#     print("{} {}".format(red, green))
+#     if red > 200 and green > 200:
+#         print("warning")
+#         cv2.putText(sign_draw, "* warning", (int(centerx), int(centery)), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255),
+#                     thickness=2)
+#         show_img("", sign_draw)
+
+
+# centers = get_square_centers(lines)
+#
+# for center in centers:
+#     area = sign_draw[int(center[0])-5:int(center[0])+5, int(center[1])-5:int(center[1]) +5]
+#     red = np.mean(area[:,:,2])
+#     green = np.mean(area[:,:,1])
+#     cv2.putText(sign_draw, "*", (int(center[1]),int(center[0])), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), thickness=2)
+#     show_img("sign",sign_draw)
+#     print(red)
+#     print(green)
+#     if red > 200 and green > 200:
+#         print("warning")
+#
+#
+# print(centers)
+# #print("{} {}".format(x,y))
 
 #draw_tl_center(sign_draw, (x,y), "yield")
-show_img("warning", sign_draw)
+# show_img("warning", sign_draw)
+"""
 cv2.destroyAllWindows()
