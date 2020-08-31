@@ -8,7 +8,7 @@ implementation and output images so you can verify your results.
 
 import cv2
 
-import ps2
+import dummy as ps2
 
 
 def draw_tl_center(image_in, center, state):
@@ -112,19 +112,19 @@ def part_2():
     output_labels = ['ps2-2-a-1', 'ps2-2-a-2', 'ps2-2-a-3', 'ps2-2-a-4',
                      'ps2-2-a-5']
 
-    sign_fns = [ ps2.stop_sign_detection,
+    sign_fns = [ps2.do_not_enter_sign_detection, ps2.stop_sign_detection,
                 ps2.construction_sign_detection, ps2.warning_sign_detection,
                 ps2.yield_sign_detection]
 
     sign_labels = ['no_entry', 'stop', 'construction', 'warning', 'yield']
 
-    input_images = ['scene_wrng_1', 'scene_yld_1']
+    input_images = ['test_images/construction_150_200_background']
 
-    output_labels = ['ps2-2-a-4','ps2-2-a-5']
+    output_labels = ["temp"]
 
-    sign_fns = [ps2.warning_sign_detection, ps2.yield_sign_detection]
+    sign_fns = [ps2.construction_sign_detection]
 
-    sign_labels = ['warning', 'yield']
+    sign_labels = ["stop"]
 
     for img_in, label, fn, name in zip(input_images, output_labels, sign_fns,
                                        sign_labels):

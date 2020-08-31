@@ -11,6 +11,11 @@ def show_img(str, img):
     cv2.imshow(str, img)
     cv2.waitKey(0)
 
+def get_length(line):
+    x1, y1 = line[0], line[1]
+    x2, y2 = line[2], line[3]
+    length = math.sqrt(abs(x1-x2)**2 + abs(y1-y2)**2)
+    return length
 
 def draw_lines(lines, img):
     for line in lines:
@@ -57,7 +62,6 @@ def get_center(circles, minx, maxx):
 
 def get_light_color(img, centers):
     r = (centers[:, 2] / 4).astype(int)
-    x, y = img.shape[:2]
     red = np.mean(img[centers[0][1] - r[0]:centers[0][1] + r[0],
                   centers[0][0] - r[0]:centers[0][0] + r[0],
                   2])
@@ -128,6 +132,29 @@ def get_diamonds(lines):
                             diamond = {"lines": set([l1t, l2t]), "common": set({ct})}
                             diamonds.append(diamond)
     return diamonds
+
+def pt_in_circle(c, r, p):
+    if (c[0] - r < p[0] < c[0] + r) and (c[1] -  r < p[1] < c[1] + r):
+        return True
+    return False
+
+def get_lines_in_circles(lines, circles):
+    linesIn = []
+    for circle in circles:
+        c = (circle[0], circle[1])
+        r = circle[2]
+        for line in lines:
+            p1 = (line[0],line[1])
+            p2 = (line[2], line[3])
+            if pt_in_circle(c,r,p1) and pt_in_circle(c,r,p2):
+                placed = False
+                for l_pair in linesIn:
+                    if tuple(circle) == l_pair["cir"]:
+                        l_pair["l"].add(tuple(line))
+                        placed = True
+                if not placed:
+                    linesIn.append({"cir": tuple(circle), "l": set({tuple(line)})})
+    return linesIn
 
 
 def traffic_light_detection(img_in, radii_range):
@@ -272,7 +299,87 @@ def stop_sign_detection(img_in):
     Returns:
         (x,y) tuple of the coordinates of the center of the stop sign.
     """
-    raise NotImplementedError
+    sign_draw = img_in.copy()
+    edges = cv2.Canny(sign_draw, 100, 200)
+    #show_img("edges of tl", edges)
+
+    lines = cv2.HoughLinesP(edges, rho=1, theta=np.pi / 36, threshold=20, minLineLength=5, maxLineGap=5)
+    lines = lines.reshape(lines.shape[0], lines.shape[2])
+
+    lengths = [5 * int(get_length(line) / 5) for line in lines]
+    #print(sorted(lengths))
+
+    lines = np.array([lines[i] for i in range(len(lines)) if 25 <= lengths[i] <= 40])
+    #print(len(lines))
+
+    i = 0
+    for line in lines:
+        if 40 >= 5 * int(get_length(line) / 5) >= 25 or lengths[i] == 995:
+            i += 1
+            cv2.line(sign_draw, (line[0], line[1]), (line[2], line[3]), (0, 0, 0), 2)
+    #show_img("", sign_draw)
+
+    linesS = filter_angles(lines, [0, 90])
+    linesA = filter_angles(lines, [45, -45])
+    octagons = []
+
+    for l1 in linesS:
+        p1 = (l1[0], l1[1])
+        p2 = (l1[2], l1[3])
+        for l2 in linesA:
+            p3 = (l2[0], l2[1])
+            p4 = (l2[2], l2[3])
+            for pin1 in [p1, p2]:
+                for pin2 in [p3, p4]:
+                    # print("{} {} {} {}".format(pin1, pin2, abs(pin1[0]-pin2[0]), abs(pin1[1]-pin2[1])))
+                    if proximal_pts(pin1, pin2, 10):
+                        common = [int((pin1[0] + pin2[0]) / 2), int((pin1[1] + pin2[1]) / 2)]
+                        placed = False
+                        l1t = tuple(l1)
+                        l2t = tuple(l2)
+                        ct = tuple(common)
+                        l1end = p2 if pin1 == p1 else p1
+                        l2end = p4 if pin2 == p3 else p3
+                        for octagon in octagons:
+                            if l1t in octagon["lines"] or l2t in octagon["lines"]:
+                                octagon["lines"].add(l1t)
+                                octagon["lines"].add(l2t)
+                                octagon["common"].add(ct)
+                                octagon["common"].add(l1end)
+                                octagon["common"].add(l2end)
+                                placed = True
+                        if not placed:
+                            octagon = {"lines": set([l1t, l2t]), "common": set({ct, l1end, l2end})}
+                            octagons.append(octagon)
+
+    fo = {"lines": set(), "common": set()}
+    for o in octagons:
+        if len(o["lines"]) >= 3:
+            fo["lines"] = fo["lines"].union(o["lines"])
+            fo["common"] = fo["common"].union(o["common"])
+    #print(len(fo["lines"]))
+
+    points = list(fo["common"])
+    pd = list([0 for i in range(len(fo["common"]))])
+
+    for i in range(len(points)):
+        distances = [proximal_pts(points[i], pt, 15) for pt in points]
+        distances[i] = False
+        for j in range(i + 1, len(distances)):
+            if pd[j] == 0 and distances[j]:
+                pd[j] = 1
+    #print(pd)
+
+    centerx = int(np.mean([points[i][0] for i in range(len(points)) if pd[i] == 0]))
+    centery = int(np.mean([points[i][1] for i in range(len(points)) if pd[i] == 0]))
+
+    area = sign_draw[centery - 5:centery + 5, centerx - 5:centerx + 5]
+    red = np.mean(area[:, :, 2])
+    green = np.mean(area[:, :, 1])
+    blue = np.mean(area[:, :, 0])
+    if red > 200:
+        return centerx, centery
+    return 0,0
 
 
 def warning_sign_detection(img_in):
@@ -336,7 +443,7 @@ def construction_sign_detection(img_in):
         area = sign_draw[int(centery) - 5:int(centery) + 5, int(centerx) - 5:int(centerx) + 5]
         red = np.mean(area[:, :, 2])
         green = np.mean(area[:, :, 1])
-        #print("{} {}".format(red, green))
+        print("{} {}".format(red, green))
         if red > 200 and 100 < green < 200:
             return int(centerx), int(centery)
 
@@ -353,7 +460,42 @@ def do_not_enter_sign_detection(img_in):
     Returns:
         (x,y) typle of the coordinates of the center of the sign.
     """
-    raise NotImplementedError
+    sign_draw = img_in.copy()
+    edges = cv2.Canny(sign_draw, 100, 200)
+    # show_img("edges of tl", edges)
+
+    lines = cv2.HoughLinesP(edges, rho=1, theta=np.pi / 36, threshold=20, minLineLength=5, maxLineGap=5)
+    lines = lines.reshape(lines.shape[0], lines.shape[2])
+    # for line in lines:
+    #     cv2.line(sign_draw, (line[0], line[1]), (line[2], line[3]), (0,0,0), 2)
+
+    circles = cv2.HoughCircles(edges, cv2.HOUGH_GRADIENT, 1, 20,
+                               param1=15, param2=20,
+                               minRadius=5, maxRadius=50)
+    if circles is None: exit()  # should become return 0, 0
+
+    circles = np.uint16(np.around(circles))
+    cshape = circles.shape
+    centers = circles.reshape(cshape[1], cshape[2])
+
+    # will get circles with lines inside of it
+    linesIn = get_lines_in_circles(lines, centers)
+
+    for l_pair in linesIn:
+        circle = np.array(l_pair["cir"])
+        r = (circle[2] / 2).astype(int)
+        red = np.mean(sign_draw[circle[1] - r:circle[1] + r,
+                      circle[0] - r:circle[0] + r,
+                      2])
+        # check circle color
+        if red > 200:
+            c = (circle[0], circle[1])
+            area = sign_draw[c[1] - 5:c[1] + 5, c[0] - 5:c[0] + 5]
+            red = np.mean(area[:, :, 2])
+            green = np.mean(area[:, :, 1])
+            blue = np.mean(area[:, :, 0])
+            if red > 200 and blue > 200 and green > 200:
+                return c[0], c[1]
 
 
 def traffic_sign_detection(img_in):
