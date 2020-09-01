@@ -8,7 +8,7 @@ implementation and output images so you can verify your results.
 
 import cv2
 
-import dummy as ps2
+import ps2
 
 
 def draw_tl_center(image_in, center, state):
@@ -86,17 +86,16 @@ def mark_traffic_signs(image_in, signs_dict):
 
 def part_1():
 
-    #input_images = ['simple_tl', 'scene_tl_1', 'scene_tl_2', 'scene_tl_3']
-    #output_labels = ['ps2-1-a-1', 'ps2-1-a-2', 'ps2-1-a-3', 'ps2-1-a-4']
-    input_images = ['/test_images/simple_tl_test']
-    output_labels = ['temp']
+    input_images = ['simple_tl', 'scene_tl_1', 'scene_tl_2', 'scene_tl_3']
+    output_labels = ['ps2-1-a-1', 'ps2-1-a-2', 'ps2-1-a-3', 'ps2-1-a-4']
+
 
     # Define a radii range, you may define a smaller range based on your
     # observations.
     radii_range = range(10, 30, 1)
 
     for img_in, label in zip(input_images, output_labels):
-
+        print(img_in)
         tl = cv2.imread("input_images/{}.png".format(img_in))
         coords, state = ps2.traffic_light_detection(tl, radii_range)
 
@@ -117,14 +116,14 @@ def part_2():
                 ps2.yield_sign_detection]
 
     sign_labels = ['no_entry', 'stop', 'construction', 'warning', 'yield']
-
-    input_images = ['test_images/construction_150_200_background']
-
-    output_labels = ["temp"]
-
-    sign_fns = [ps2.construction_sign_detection]
-
-    sign_labels = ["stop"]
+    #
+    # input_images = ['test_images/construction_150_200_background']
+    #
+    # output_labels = ["temp"]
+    #
+    # sign_fns = [ps2.construction_sign_detection]
+    #
+    # # sign_labels = ["stop"]
 
     for img_in, label, fn, name in zip(input_images, output_labels, sign_fns,
                                        sign_labels):
@@ -146,7 +145,7 @@ def part_3():
 
         scene = cv2.imread("input_images/{}.png".format(img_in))
         coords = ps2.traffic_sign_detection(scene)
-
+        print(coords)
         img_out = mark_traffic_signs(scene, coords)
         cv2.imwrite("{}.png".format(label), img_out)
 
@@ -187,9 +186,9 @@ def part_5b():
         cv2.imwrite("{}.png".format(label), img_out)
 
 if __name__ == '__main__':
-    #part_1()
+    part_1()
     part_2()
-    #part_3()
+    part_3()
     #part_4()
     #part_5a()
     #part_5b()
