@@ -57,10 +57,10 @@ def draw_tl_center(image_in, center, state):
     return img
 
 
-tl = cv2.imread("input_images\\scene_tl_1.png")
+tl = cv2.imread("input_images\\scene_some_signs_noisy.png")
 tl_draw = copy.deepcopy(tl)
 #show_img("sample tl", tl)
-
+""""
 #should I convert it to grayscale???????
 tl_gray = cv2.cvtColor(tl, cv2.COLOR_BGR2GRAY)
 #show_img("gray scale", tl_gray)
@@ -79,12 +79,12 @@ draw_lines(lines, tl_draw)
 #get x axis of the vertical lines
 xmin, xmax = get_vertical(lines)
 
-"""
+
 So far, all tl images, have just two vertical lines - related to tl itself. 
 The vertical lines have x=a kind of structure, thus its y component is always 0. 
 so to identify the tl, first find the two vertical lines - which will give you approximate location for center x
 then find the three circles in between those two x values, and identify the circle in between - > that will provide y.
-"""
+
 
 circles = cv2.HoughCircles(edges, cv2.HOUGH_GRADIENT, 1, 20,
                           param1=15, param2=20,
@@ -117,5 +117,19 @@ if circles is not None:
     tl_draw = draw_tl_center(tl, (center_tl[0],center_tl[1]), color)
     show_img("lines and circles", tl_draw)
 
+"""
+
+sh = tl_draw.shape
+
+print("this is x {}".format(sh[0]))
+for i in range(1, sh[0]-1, 10):
+    cv2.putText(tl_draw, "*", (50,i), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0), thickness=2)
+show_img("x", tl_draw)
+
+print("this is y {}".format(sh[1]))
+for i in range(1, sh[1]-1, 10):
+    cv2.putText(tl_draw, "*", (i,50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0), thickness=2)
+
+show_img("y", tl_draw)
 
 cv2.destroyAllWindows()
