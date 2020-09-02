@@ -223,6 +223,7 @@ def traffic_light_detection(img_in, radii_range):
     # print(lines)
     # get x axis of the vertical lines
     check_circle = False
+    tlc = []
 
     if get_vertical(lines) == None:
         circles = cv2.HoughCircles(edges, cv2.HOUGH_GRADIENT, 1, 20,
@@ -233,7 +234,6 @@ def traffic_light_detection(img_in, radii_range):
         cshape = circles.shape
         c_checks = circles.reshape(cshape[1], cshape[2])
         near = [0 for i in range(len(c_checks))]
-        tlc = []
         cx, r = 0, 0
         for i in range(len(c_checks)):
             c1 = c_checks[i]
@@ -268,7 +268,9 @@ def traffic_light_detection(img_in, radii_range):
     circles = cv2.HoughCircles(edges, cv2.HOUGH_GRADIENT, 1, 20,
                                param1=15, param2=20,
                                minRadius=max(5, min(radii_range) - 5), maxRadius=min(50, max(radii_range) + 10))
+
     if circles is None: return (0,0), ""
+
     circles = np.uint16(np.around(circles))
         #draw_circles(circles, tl)
         #show_img("lines and circles", tl)
@@ -278,11 +280,12 @@ def traffic_light_detection(img_in, radii_range):
 
         # get the circles between the two vertical lines
     centers = centers[(centers[:, 0] > xmin) * (centers[:, 0] < xmax), :]
+    if len(centers) < 3:
+        return (0, 0), ""
     centers = centers[centers[:, 1].argsort()]
 
         # get the color which is on
     color = get_light_color(tl, centers)
-
     center_tl = get_center(circles, xmin, xmax)
     return (center_tl[0], center_tl[1]), color
 
@@ -304,15 +307,15 @@ def yield_sign_detection(img_in):
     """
     sign_draw = img_in.copy()
     edges = cv2.Canny(sign_draw, 100, 200)
-
+    #show_img(sign_draw)
     lines = cv2.HoughLinesP(edges, rho=1, theta=np.pi / 36, threshold=20, minLineLength=5, maxLineGap=5)
     if (len(lines)) == 0:
         return 0, 0
     lines = lines.reshape(lines.shape[0], lines.shape[2])
 
     # filter lines with 0, +60 and -60 angles
-    side_60 = filter_angles(lines, [60])
-    side__60 = filter_angles(lines, [-60])
+    side_60 = filter_angles(lines, range(55,66,1))
+    side__60 = filter_angles(lines, range(-55, -66,-1))
 
     triangle = []
 
@@ -407,6 +410,8 @@ def stop_sign_detection(img_in):
                             octagons.append(octagon)
 
     fo = {"lines": set(), "common": set()}
+    if len(octagons) == 0:
+        return 0, 0
     for o in octagons:
         if len(o["lines"]) >= 3:
             fo["lines"] = fo["lines"].union(o["lines"])
@@ -633,7 +638,13 @@ def traffic_sign_detection_noisy(img_in):
               These are just example values and may not represent a
               valid scene.
     """
-    raise NotImplementedError
+    blurred = cv2.GaussianBlur(img_in, (5,5),0)
+    denoised = cv2.fastNlMeansDenoisingColored(blurred,None,10,10,7,21)
+    show_img("denoised", denoised)
+    edges = cv2.Canny(denoised, 100, 200)
+    show_img("edges", edges)
+    signs = traffic_sign_detection(denoised)
+    return signs
 
 
 def traffic_sign_detection_challenge(img_in):
@@ -654,4 +665,11 @@ def traffic_sign_detection_challenge(img_in):
               These are just example values and may not represent a
               valid scene.
     """
-    raise NotImplementedError
+    blurred = cv2.GaussianBlur(img_in, (15, 15), 0)
+    #show_img("blurred", blurred)
+    denoised = cv2.fastNlMeansDenoisingColored(blurred, None, 10, 10, 7, 21)
+    #show_img("denoised", denoised)
+    edges = cv2.Canny(denoised, 100, 200)
+    show_img("edges", edges)
+    signs = traffic_sign_detection(denoised)
+    return signs
