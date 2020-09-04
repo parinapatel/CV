@@ -115,6 +115,8 @@ class TestTrafficSignsBlank(unittest.TestCase):
         test_image = cv2.imread("input_images/test_images/" + image_name)
         coords = ps2.stop_sign_detection(test_image)
 
+        print(coords)
+
         check_result(image_name, coords, (149, 249), 5)
 
     def test_construction_sign(self):
