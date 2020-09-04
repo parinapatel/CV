@@ -416,6 +416,17 @@ def stop_sign_detection(img_in):
                         ct = tuple(common)
                         l1end = p2 if pin1 == p1 else p1
                         l2end = p4 if pin2 == p3 else p3
+
+                        l1_length = get_length(l1)
+                        l2_length = get_length(l2)
+                        l = max(l1_length, l2_length)
+                        pin1l2 = get_length([pin1[0], pin1[1], l2end[0], l2end[1]])
+                        pin2l1 = get_length([pin2[0], pin2[1], l1end[0], l1end[1]])
+                        if abs(pin1l2 - l) < abs(pin2l1 - l):
+                            ct = tuple(pin1)
+                        else:
+                            ct = tuple(pin2)
+
                         for octagon in octagons:
                             if l1t in octagon["lines"] or l2t in octagon["lines"]:
                                 octagon["lines"].add(l1t)
