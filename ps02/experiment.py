@@ -109,6 +109,9 @@ def part_1():
     input_images = ['simple_tl', 'scene_tl_1', 'scene_tl_2', 'scene_tl_3']
     output_labels = ['ps2-1-a-1', 'ps2-1-a-2', 'ps2-1-a-3', 'ps2-1-a-4']
 
+    input_images = ['scene_tl_failing']
+    output_labels = ['test_failing']
+
 
     # Define a radii range, you may define a smaller range based on your
     # observations.

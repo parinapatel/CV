@@ -5,6 +5,9 @@ import cv2
 
 import numpy as np
 
+def show_img(str, img):
+    cv2.imshow(str, img)
+    cv2.waitKey(0)
 
 def intersec(line1, line2):
     noise1 = np.asscalar(0.00001 * np.random.rand(1, 1))
@@ -263,19 +266,6 @@ def find_stop_sign(coordinates, threshold1):
             for j in range(len(horizontal_edges)):
                 possible_hori[(i, j)] = abs(horizontal_edges[i][0] - horizontal_edges[j][0])
 
-        #     possible_left=dict()
-        #     for i in range(len(left_edges)):
-        #         for j in range(len(left_edges)):
-        #             possible_left[(i,j)]=abs(left_edges[i][0]-left_edges[j][0])
-
-        #     possible_right=dict()
-        #     for i in range(len(right_edges)):
-        #         for j in range(len(right_edges)):
-        #             possible_right[(i,j)]=abs(right_edges[i][0]-right_edges[j][0])
-
-        # print "possible_hori", possible_hori
-        # print "dist", dist
-        # logic: the distance between opposite sides should be close
         edge1s = []
         edge5s = []
         for key, value in possible_hori.items():
@@ -320,120 +310,6 @@ def find_stop_sign(coordinates, threshold1):
             else:
                 continue
 
-        # print "edges", edge1, edge2, edge3, edge4, edge5, edge6, edge7, edge8
-
-        #     edge1=horizontal_edges[0]
-        #     edge5=horizontal_edges[4]
-
-        #     for key, value in possible_left.items():
-        #         if abs(dist-value)<4:
-        #             key=list(key)
-        #             key.sort()
-        # #             print "key", key
-        #             edge2=left_edges[key[0]]
-        #             edge6=left_edges[key[1]]
-        #             break
-        #         else:
-        #             continue
-
-        #     for key, value in possible_right.items():
-        #         if abs(dist-value)<4:
-        #             key=list(key)
-        #             key.sort()
-        # #             print "key", key
-        #             edge4=right_edges[key[0]]
-        #             edge8=right_edges[key[1]]
-        #             break
-        #         else:
-        #             continue
-
-        #     line1s=horizontal_edges
-        #     line5s=horizontal_edges
-        #     line2s=left_edges
-        #     line6s=left_edges
-        #     line3s=vertical_edges
-        #     line7s=vertical_edges
-        #     line4s=right_edges
-        #     line8s=right_edges
-
-        #     possible_edges=[]
-        #     for line1 in line1s:
-        #         for line2 in line2s:
-        #             for line3 in line3s:
-        #                 for line4 in line4s:
-        #                     for line5 in line5s:
-        #                         for line6 in line6s:
-        #                             for line7 in line7s:
-        #                                 for line8 in line8s:
-        #                                     possible_edges.append((line1, line2, line3, line4,line5,line6,line7,line8))
-
-        #     possible_vertexs=[]
-        #     for edges in possible_edges:
-        # #         # print "current edges", edges
-        #         store_vertexs=[]
-        #         for j in range(8):
-        #             store_vertexs.append(intersec(edges[j-1], edges[j]))
-        # #         # print "current store_vertexs", store_vertexs
-        #         possible_vertexs.append(store_vertexs)
-
-        #     for vertexs in possible_vertexs:
-        #         # print "possing vertexs", vertexs
-        #         dist_1 = np.sqrt( (vertexs[1][0] - vertexs[0][0])**2 + (vertexs[1][1] - vertexs[0][1])**2 )
-        #         dist_2 = np.sqrt( (vertexs[2][0] - vertexs[1][0])**2 + (vertexs[2][1] - vertexs[1][1])**2 )
-        #         dist_3 = np.sqrt( (vertexs[3][0] - vertexs[2][0])**2 + (vertexs[3][1] - vertexs[2][1])**2 )
-        #         dist_4 = np.sqrt( (vertexs[4][0] - vertexs[3][0])**2 + (vertexs[4][1] - vertexs[3][1])**2 )
-        #         dist_5 = np.sqrt( (vertexs[5][0] - vertexs[4][0])**2 + (vertexs[5][1] - vertexs[4][1])**2 )
-        #         dist_6 = np.sqrt( (vertexs[6][0] - vertexs[5][0])**2 + (vertexs[6][1] - vertexs[5][1])**2 )
-        #         dist_7 = np.sqrt( (vertexs[7][0] - vertexs[6][0])**2 + (vertexs[7][1] - vertexs[6][1])**2 )
-        #         dist_8 = np.sqrt( (vertexs[0][0] - vertexs[7][0])**2 + (vertexs[0][1] - vertexs[7][1])**2 )
-        #         # print "dist_1", dist_1, dist_2,dist_3, dist_4,dist_5, dist_6,dist_7, dist_8
-
-        #         if abs(dist_1-dist_2)>0.5:
-        #             possible_vertexs = [e for e in possible_vertexs if not np.array_equal(e,vertexs)]
-
-        #     possible_centers=[]
-        #     valid_vertexs=[]
-
-        # #     print "circles", circle_coordinates
-        #     for vertexs in possible_vertexs:
-        #         # print "current vertexs", vertexs
-        # #         print "vertexs", vertexs
-        #         center_x = (sum([vertex[0] for vertex in vertexs])/len(vertexs)).astype(int)
-        #         center_y = (sum([vertex[1] for vertex in vertexs])/len(vertexs)).astype(int)
-        # #         print "center_x", (center_x, center_y)
-        #         possible_centers.append((center_x, center_y))
-        #         valid_vertexs.append(vertexs)
-
-        #     centers=()
-        #     vertexs=[]
-        #     if len(possible_centers)>0:
-        #         centers=possible_centers[0]
-        #         vertexs=valid_vertexs[0]
-        #     return centers, vertexs
-
-        # print "detected edges", (edge1, edge2, edge3, edge4, edge5, edge6, edge7, edge8)
-
-        #     horizontal_edges = sorted(coordinates, key=lambda x:abs(x[1]-0.0*np.pi/4.0))[:2]
-        #     vertical_edges = sorted(vertical_lines, key=lambda x:x[0])
-        #     edge3=vertical_edges[1]
-        #     edge7=vertical_edges[0]
-
-        #     vertical_edges = sorted(coordinates, key=lambda x:abs(x[1]-0.0*np.pi/4.0))[:2]
-        #     vertical_edges = sorted(vertical_lines, key=lambda x:x[0])
-        #     edge3=vertical_edges[1]
-        #     edge7=vertical_edges[0]
-
-        #     vertical_edges = sorted(coordinates, key=lambda x:abs(x[1]-0.0*np.pi/4.0))[:2]
-        #     vertical_edges = sorted(vertical_lines, key=lambda x:x[0])
-        #     edge3=vertical_edges[1]
-        #     edge7=vertical_edges[0]
-
-        #     right_edges = sorted(coordinates, key=lambda x:abs(x[1]-1.0*np.pi/4.0))[:2]
-        #     right_edges = sorted(right_lines, key=lambda x:x[0])
-        #     edge4=vertical_edges[1]
-        #     edge8=vertical_edges[0]
-
-        #     # print "vertical_lines", vertical_lines
 
         centers = ()
         vertexs = [inter1, inter2, inter3, inter4, inter5, inter6, inter7, inter8]
@@ -561,120 +437,6 @@ def find_square_sign(coordinates, threshold):
     return centers, vertexs
 
 
-# def find_construction_sign(coordinates):
-#     """Part2: hough transform to detect circles
-#     """
-# #     # print "coordinates", coordinates
-
-#     """
-#     Part3: Find the valid lines based on the theta difference
-#         Logic to use:
-#             1. The angle between two lines are 135
-#             2. The rho of current line with previous lines should have tangleable difference
-#             3. The vertexs are intersection of qualified lines
-#             4. The side lengh must be approximately close enough
-#             5. The centers BGR value should match the reference
-#     """
-
-# #     # print "total lines", len(coordinates)
-#     possible_edges = []
-#     for line1 in coordinates:
-# #         # print "#####start line1", line1
-#         for line2 in coordinates:
-
-#             if (line1!=line2) and abs(line1[1]-line2[1]-np.pi/2.0)<0.001:
-# #                 # print "@@@@@find line2", line1, line2
-#                 for line3 in coordinates :
-
-#                     if (line3!=line2 and line3!=line1) and abs(abs(line2[1]-line3[1])-np.pi/2.0)<0.001 \
-#                     and abs(line3[0]-line2[0])>5 and abs(line3[0]-line1[0])>5:
-# #                         # print "$$$$find line3", line1, line2, line3
-#                         for line4 in coordinates :
-
-#                             if (line4!=line3 and line4!=line2 and line4!=line1) and abs(abs(line3[1]-line4[1])-np.pi/2.0)<0.001 \
-#                             and abs(line4[0]-line3[0])>5 and abs(line4[0]-line2[0])>5 and abs(line4[0]-line1[0])>5:
-# #                                 # print "%%%%find line4", line1, line2, line3, line4
-#                                 possible_edges.append((line1, line2, line3, line4))
-# #                                 # print "coordinates before remove", coordinates
-# #                                 # print "current remove elements", line1[1], line2[1], line3[1], line4[1]
-# #                                 coordinates = [e for e in coordinates if e not in (line1, line2, line3, line4)]
-# # #                                 coordinates.remove(line1)
-# # #                                 coordinates.remove(line2)
-# # #                                 coordinates.remove(line3)
-# # #                                 coordinates.remove(line4)
-# #                                 # print "coordinates after remove", coordinates
-#                             else:
-#                                 continue
-#                     else:
-#                         continue
-#             else:
-#                 continue
-# #     print possible_edges
-# #     edges=possible_edges[2]
-
-
-#     possible_vertexs=[]
-
-#     for edges in possible_edges:
-#         store_vertexs=[]
-#         for j in range(4):
-#             store_vertexs.append(intersec(edges[j-1], edges[j]))
-# #         # print "current store_vertexs", store_vertexs
-
-#         possible_vertexs.append(store_vertexs)
-
-
-#     for vertexs in possible_vertexs:
-#         # print "possing vertexs", vertexs
-#         dist_1 = np.sqrt( (vertexs[1][0] - vertexs[0][0])**2 + (vertexs[1][1] - vertexs[0][1])**2 )
-#         dist_2 = np.sqrt( (vertexs[2][0] - vertexs[1][0])**2 + (vertexs[2][1] - vertexs[1][1])**2 )
-#         # print "dist_1", dist_1
-#         # print "dist_2", dist_2
-#         if abs(dist_1-dist_2)>1:
-#             possible_vertexs = [e for e in possible_vertexs if not np.array_equal(e,vertexs)]
-
-# #     print "possible_vertexs after distance check", possible_vertexs
-
-
-#     possible_centers=[]
-#     valid_vertexs=[]
-
-# #     print "circles", circle_coordinates
-#     for vertexs in possible_vertexs:
-# #         print "current vertexs", vertexs
-# #         print "vertexs", vertexs
-#         center_x = (sum([vertex[0] for vertex in vertexs])/len(vertexs)).astype(int)
-#         center_y = (sum([vertex[1] for vertex in vertexs])/len(vertexs)).astype(int)
-# #         print "center_x", (center_x, center_y)
-
-# #         A=img_in[center_y][center_x]
-# #         B=[0,128,255]
-
-# #         if np.array_equal(A,B):
-# #             print "A", A, B
-# #             print "center", center_x, center_y
-# #             print "all circles", circle_coordinates
-# #             #QC Part, draw vertexs
-# #             for circle_coordinate in circle_coordinates:
-# #                 if abs(center_x - circle_coordinate[0]) <1.5 and abs(center_y - circle_coordinate[1]) <1.5:
-
-
-#         possible_centers.append((center_x, center_y))
-#         valid_vertexs.append(vertexs)
-# #             break
-
-# #         else:
-# #             continue
-
-#     """Part4: return the outputs
-#     """
-#     centers=()
-#     vertexs=[]
-#     if len(possible_centers)>0:
-#         centers=possible_centers[0]
-#         vertexs=valid_vertexs[0]
-#     return centers, vertexs
-
 def find_do_not_enter_sign(coordinates):
     """Part2: hough transform to detect circles
     """
@@ -723,8 +485,7 @@ def find_traffic_light(coordinates, circle_coordinates):
 
                             if (line4 != line3 and line4 != line2 and line4 != line1) and abs(
                                     abs(line3[1] - line4[1]) - np.pi / 2.0) < 0.00001 \
-                                    and abs(line4[0] - line3[0]) > 5 and abs(line4[0] - line2[0]) > 5 and abs(
-                                line4[0] - line1[0]) > 5:
+                                    and abs(line4[0] - line3[0]) > 5 and abs(line4[0] - line2[0]) > 5 and abs(line4[0] - line1[0]) > 5:
                                 #                                 # print "%%%%find line4", line1, line2, line3, line4
                                 possible_edges.append((line1, line2, line3, line4))
                             #                                 # print "coordinates before remove", coordinates
@@ -846,6 +607,7 @@ def traffic_light_detection(img_in, radii_range):
     #     # print min_r, max_r
 
     coordinates = houghcircles(gray, 50, min_r, max_r)
+    print coordinates
     #     # print coordinates
     #     for i in range(len(coordinates)):
     #         # print i

@@ -8,8 +8,7 @@ import numpy as np
 import math
 
 def show_img(str, img):
-    cv2.imshow(str, img)
-    cv2.waitKey(0)
+    return
 
 
 def get_length(line):
@@ -207,14 +206,24 @@ def traffic_light_detection(img_in, radii_range):
 
     tl = img_in.copy()
 
+
+    img_hsv = cv2.cvtColor(tl, cv2.COLOR_BGR2HSV)
+
+    lower = np.array([0, 0, 46])  # example value
+    upper = np.array([180, 43, 100])  # example value
+    mask = cv2.inRange(img_hsv, lower, upper)
+    edges = cv2.Canny(mask, 300, 1200)
+
     # edges of traffic light
-    edges = cv2.Canny(tl, 100, 200)
+    #edges = cv2.Canny(tl, 100, 200)
     #show_img("edges of image", edges)
 
     # get all lines using Hough Transform
     lines = cv2.HoughLines(edges, 1, np.pi / 180, 100)
-    if (len(lines)) == 0:
-        return (0, 0), ""
+    # if lines is None:
+    #     return (0,0), ""
+    # if (len(lines)) == 0:
+    #     return (0, 0), ""
 
 
     # print all lines
@@ -225,7 +234,7 @@ def traffic_light_detection(img_in, radii_range):
     check_circle = False
     tlc = []
 
-    if get_vertical(lines) == None:
+    if (lines is None) or (len(lines) == 0) or (get_vertical(lines) is None):
         circles = cv2.HoughCircles(edges, cv2.HOUGH_GRADIENT, 1, 20,
                                    param1=15, param2=20,
                                    minRadius=max(5, min(radii_range) - 5), maxRadius=min(50, max(radii_range) + 10))
@@ -272,8 +281,8 @@ def traffic_light_detection(img_in, radii_range):
     if circles is None: return (0,0), ""
 
     circles = np.uint16(np.around(circles))
-        #draw_circles(circles, tl)
-        #show_img("lines and circles", tl)
+    #draw_circles(circles, tl)
+    #show_img("lines and circles", tl)
 
     cshape = circles.shape
     centers = circles.reshape(cshape[1], cshape[2])
@@ -354,7 +363,13 @@ def stop_sign_detection(img_in):
     Returns:
         (x,y) tuple of the coordinates of the center of the stop sign.
     """
-    sign_draw = img_in.copy()
+    sign = img_in.copy()
+    # sign_hsv = cv2.cvtColor(sign, cv2.COLOR_BGR2HSV)
+    # lower = np.array([0, 43, 46])
+    # upper = np.array([10, 255, 230])
+    #
+    # sign_draw = cv2.inRange(sign_hsv, lower, upper)
+    sign_draw = sign.copy()
     edges = cv2.Canny(sign_draw, 100, 200)
     #show_img("edges of tl", edges)
 
@@ -362,6 +377,10 @@ def stop_sign_detection(img_in):
     if (len(lines)) == 0:
         return 0, 0
     lines = lines.reshape(lines.shape[0], lines.shape[2])
+
+    print(len(lines))
+
+    #show_img("", edges)
 
     lengths = [5 * int(get_length(line) / 5) for line in lines]
     #print(sorted(lengths))
@@ -432,7 +451,7 @@ def stop_sign_detection(img_in):
     centerx = int(np.mean([points[i][0] for i in range(len(points)) if pd[i] == 0]))
     centery = int(np.mean([points[i][1] for i in range(len(points)) if pd[i] == 0]))
 
-    area = sign_draw[centery - 5:centery + 5, centerx - 5:centerx + 5]
+    area = sign[centery - 5:centery + 5, centerx - 5:centerx + 5]
     red = np.mean(area[:, :, 2])
     green = np.mean(area[:, :, 1])
     blue = np.mean(area[:, :, 0])
@@ -565,6 +584,9 @@ def do_not_enter_sign_detection(img_in):
     return 0, 0
 
 
+
+
+
 def traffic_sign_detection(img_in):
     """Finds all traffic signs in a synthetic image.
 
@@ -595,7 +617,7 @@ def traffic_sign_detection(img_in):
               valid scene.
     """
     all_signs = {}
-    coordinates = [traffic_light_detection(img_in, range(5,50,1))[0],
+    coordinates = [traffic_light_detection(img_in, range(0,50,1))[0],
                    do_not_enter_sign_detection(img_in),
                    stop_sign_detection(img_in),
                    warning_sign_detection(img_in),
@@ -640,9 +662,9 @@ def traffic_sign_detection_noisy(img_in):
     """
     blurred = cv2.GaussianBlur(img_in, (5,5),0)
     denoised = cv2.fastNlMeansDenoisingColored(blurred,None,10,10,7,21)
-    show_img("denoised", denoised)
+    #show_img("denoised", denoised)
     edges = cv2.Canny(denoised, 100, 200)
-    show_img("edges", edges)
+    #show_img("edges", edges)
     signs = traffic_sign_detection(denoised)
     return signs
 
@@ -670,6 +692,6 @@ def traffic_sign_detection_challenge(img_in):
     denoised = cv2.fastNlMeansDenoisingColored(blurred, None, 10, 10, 7, 21)
     #show_img("denoised", denoised)
     edges = cv2.Canny(denoised, 100, 200)
-    show_img("edges", edges)
+    #show_img("edges", edges)
     signs = traffic_sign_detection(denoised)
     return signs

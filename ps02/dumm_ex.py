@@ -101,7 +101,7 @@ def part_1():
         coords, state = ps2.traffic_light_detection(tl, radii_range)
 
         img_out = draw_tl_center(tl, coords, state)
-        cv2.imwrite("{}.png".format(label), img_out)
+        cv2.imwrite("{}_dummy.png".format(label), img_out)
 
 
 def part_2():
@@ -118,13 +118,7 @@ def part_2():
 
     sign_labels = ['no_entry', 'stop', 'construction', 'warning', 'yield']
 
-    input_images = ['test_images/construction_150_200_background']
 
-    output_labels = ["temp"]
-
-    sign_fns = [ps2.construction_sign_detection]
-
-    sign_labels = ["stop"]
 
     for img_in, label, fn, name in zip(input_images, output_labels, sign_fns,
                                        sign_labels):
@@ -134,7 +128,7 @@ def part_2():
 
         temp_dict = {name: coords}
         img_out = mark_traffic_signs(sign_img, temp_dict)
-        cv2.imwrite("{}.png".format(label), img_out)
+        cv2.imwrite("{}_dummy.png".format(label), img_out)
 
 
 def part_3():
@@ -148,7 +142,7 @@ def part_3():
         coords = ps2.traffic_sign_detection(scene)
 
         img_out = mark_traffic_signs(scene, coords)
-        cv2.imwrite("{}.png".format(label), img_out)
+        cv2.imwrite("{}_dummy.png".format(label), img_out)
 
 
 def part_4():
@@ -160,7 +154,7 @@ def part_4():
         coords = ps2.traffic_sign_detection_noisy(scene)
 
         img_out = mark_traffic_signs(scene, coords)
-        cv2.imwrite("{}.png".format(label), img_out)
+        cv2.imwrite("{}_dummy.png".format(label), img_out)
 
 
 def part_5a():
@@ -172,7 +166,7 @@ def part_5a():
         coords = ps2.traffic_sign_detection_challenge(scene)
 
         img_out = mark_traffic_signs(scene, coords)
-        cv2.imwrite("{}.png".format(label), img_out)
+        cv2.imwrite("{}_dummy.png".format(label), img_out)
 
 
 def part_5b():
@@ -184,12 +178,12 @@ def part_5b():
         coords = ps2.traffic_sign_detection_challenge(scene)
 
         img_out = mark_traffic_signs(scene, coords)
-        cv2.imwrite("{}.png".format(label), img_out)
+        cv2.imwrite("{}_dummy.png".format(label), img_out)
 
 if __name__ == '__main__':
     #part_1()
-    part_2()
-    #part_3()
+    #part_2()
+    part_3()
     #part_4()
     #part_5a()
     #part_5b()
