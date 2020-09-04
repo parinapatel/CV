@@ -363,13 +363,11 @@ def stop_sign_detection(img_in):
     Returns:
         (x,y) tuple of the coordinates of the center of the stop sign.
     """
-    sign = img_in.copy()
-    # sign_hsv = cv2.cvtColor(sign, cv2.COLOR_BGR2HSV)
-    # lower = np.array([0, 43, 46])
-    # upper = np.array([10, 255, 230])
-    #
-    # sign_draw = cv2.inRange(sign_hsv, lower, upper)
-    sign_draw = sign.copy()
+    sign= img_in.copy()
+    img_hsv = cv2.cvtColor(img_in, cv2.COLOR_BGR2HSV)
+    lower = np.array([0, 43, 46])
+    upper = np.array([10, 255, 230])
+    sign_draw = cv2.inRange(img_hsv, lower, upper)
     edges = cv2.Canny(sign_draw, 100, 200)
     #show_img("edges of tl", edges)
 
@@ -388,12 +386,13 @@ def stop_sign_detection(img_in):
     lines = np.array([lines[i] for i in range(len(lines)) if 25 <= lengths[i] <= 40])
     #print(len(lines))
 
-    i = 0
-    for line in lines:
-        if 40 >= 5 * int(get_length(line) / 5) >= 25 or lengths[i] == 995:
-            i += 1
-            cv2.line(sign_draw, (line[0], line[1]), (line[2], line[3]), (0, 0, 0), 2)
-    #show_img("", sign_draw)
+    #i = 0
+
+    # for line in lines:
+    #     if 40 >= 5 * int(get_length(line) / 5) >= 25 or lengths[i] == 995:
+    #         i += 1
+    #         cv2.line(sign, (line[0], line[1]), (line[2], line[3]), (0, 0, 0), 2)
+    # #show_img("", sign_draw)
 
     linesS = filter_angles(lines, [0, 90])
     linesA = filter_angles(lines, [45, -45])
@@ -470,6 +469,119 @@ def stop_sign_detection(img_in):
         return centerx, centery
     return 0,0
 
+def stop_sign_detection_noisy(img_in):
+    """Finds the centroid coordinates of a stop sign in the provided
+    image.
+
+    Args:
+        img_in (numpy.array): image containing a traffic light.
+
+    Returns:
+        (x,y) tuple of the coordinates of the center of the stop sign.
+    """
+    sign_draw = img_in.copy()
+    sign = img_in.copy()
+
+    edges = cv2.Canny(sign_draw, 100, 200)
+    #show_img("edges of tl", edges)
+
+    lines = cv2.HoughLinesP(edges, rho=1, theta=np.pi / 36, threshold=20, minLineLength=5, maxLineGap=5)
+    if (len(lines)) == 0:
+        return 0, 0
+    lines = lines.reshape(lines.shape[0], lines.shape[2])
+
+    #print(len(lines))
+
+    #show_img("", edges)
+
+    lengths = [5 * int(get_length(line) / 5) for line in lines]
+    #print(sorted(lengths))
+
+    lines = np.array([lines[i] for i in range(len(lines)) if 25 <= lengths[i] <= 40])
+    #print(len(lines))
+
+    i = 0
+    for line in lines:
+        if 40 >= 5 * int(get_length(line) / 5) >= 25 or lengths[i] == 995:
+            i += 1
+            cv2.line(sign, (line[0], line[1]), (line[2], line[3]), (0, 0, 0), 2)
+    #show_img("", sign_draw)
+
+    linesS = filter_angles(lines, [0, 90])
+    linesA = filter_angles(lines, [45, -45])
+    octagons = []
+
+    for l1 in linesS:
+        p1 = (l1[0], l1[1])
+        p2 = (l1[2], l1[3])
+        for l2 in linesA:
+            p3 = (l2[0], l2[1])
+            p4 = (l2[2], l2[3])
+            for pin1 in [p1, p2]:
+                for pin2 in [p3, p4]:
+                    # print("{} {} {} {}".format(pin1, pin2, abs(pin1[0]-pin2[0]), abs(pin1[1]-pin2[1])))
+                    if proximal_pts(pin1, pin2, 10):
+                        common = [int((pin1[0] + pin2[0]) / 2) + 2, int((pin1[1] + pin2[1]) / 2) - 3]
+                        placed = False
+                        l1t = tuple(l1)
+                        l2t = tuple(l2)
+                        ct = tuple(common)
+                        l1end = p2 if pin1 == p1 else p1
+                        l2end = p4 if pin2 == p3 else p3
+
+                        l1_length = get_length(l1)
+                        l2_length = get_length(l2)
+                        l = max(l1_length, l2_length)
+                        pin1l2 = get_length([pin1[0], pin1[1], l2end[0], l2end[1]])
+                        pin2l1 = get_length([pin2[0], pin2[1], l1end[0], l1end[1]])
+                        if abs(pin1l2 - l) < abs(pin2l1 - l):
+                            ct = tuple(pin1)
+                        else:
+                            ct = tuple(pin2)
+
+                        for octagon in octagons:
+                            if l1t in octagon["lines"] or l2t in octagon["lines"]:
+                                octagon["lines"].add(l1t)
+                                octagon["lines"].add(l2t)
+                                octagon["common"].add(ct)
+                                octagon["common"].add(l1end)
+                                octagon["common"].add(l2end)
+                                placed = True
+                        if not placed:
+                            octagon = {"lines": set([l1t, l2t]), "common": set({ct, l1end, l2end})}
+                            octagons.append(octagon)
+
+    fo = {"lines": set(), "common": set()}
+    if len(octagons) == 0:
+        return 0, 0
+    for o in octagons:
+        if len(o["lines"]) >= 3:
+            fo["lines"] = fo["lines"].union(o["lines"])
+            fo["common"] = fo["common"].union(o["common"])
+    #print(len(fo["lines"]))
+    # show_img("", edges)
+    # cv2.destroyAllWindows()
+    points = list(fo["common"])
+    pd = list([0 for i in range(len(fo["common"]))])
+
+    for i in range(len(points)):
+        distances = [proximal_pts(points[i], pt, 15) for pt in points]
+        distances[i] = False
+        for j in range(i + 1, len(distances)):
+            if pd[j] == 0 and distances[j]:
+                pd[j] = 1
+    #print(pd)
+
+    centerx = int(np.mean([points[i][0] for i in range(len(points)) if pd[i] == 0]))
+    centery = int(np.mean([points[i][1] for i in range(len(points)) if pd[i] == 0]))
+
+    area = sign[centery - 5:centery + 5, centerx - 5:centerx + 5]
+    red = np.mean(area[:, :, 2])
+    green = np.mean(area[:, :, 1])
+    blue = np.mean(area[:, :, 0])
+    if red > 200:
+        return centerx, centery
+    return 0,0
 
 def warning_sign_detection(img_in):
     """Finds the centroid coordinates of a warning sign in the
@@ -674,10 +786,21 @@ def traffic_sign_detection_noisy(img_in):
     blurred = cv2.GaussianBlur(img_in, (5,5),0)
     denoised = cv2.fastNlMeansDenoisingColored(blurred,None,10,10,7,21)
     #show_img("denoised", denoised)
-    edges = cv2.Canny(denoised, 100, 200)
+    # edges = cv2.Canny(denoised, 300, 1200)
     #show_img("edges", edges)
-    signs = traffic_sign_detection(denoised)
-    return signs
+    all_signs = {}
+    coordinates = [traffic_light_detection(denoised, range(1, 50, 1))[0],
+                   do_not_enter_sign_detection(denoised),
+                   stop_sign_detection_noisy(denoised),
+                   warning_sign_detection(denoised),
+                   yield_sign_detection(denoised),
+                   construction_sign_detection(denoised)]
+    signs = ["traffic_light", "no_entry", "stop", "warning", "yield", "construction"]
+
+    for i in range(len(signs)):
+        if coordinates[i] != (0, 0):
+            all_signs[signs[i]] = coordinates[i]
+    return all_signs
 
 
 def traffic_sign_detection_challenge(img_in):
