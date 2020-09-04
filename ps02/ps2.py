@@ -445,7 +445,7 @@ def stop_sign_detection(img_in):
         if len(o["lines"]) >= 3:
             fo["lines"] = fo["lines"].union(o["lines"])
             fo["common"] = fo["common"].union(o["common"])
-    #print(len(fo["lines"]))
+    print(len(fo["lines"]))
 
     points = list(fo["common"])
     pd = list([0 for i in range(len(fo["common"]))])
@@ -466,7 +466,7 @@ def stop_sign_detection(img_in):
     green = np.mean(area[:, :, 1])
     blue = np.mean(area[:, :, 0])
     if red > 200:
-        return centerx, centery
+        return centerx-6, centery
     return 0,0
 
 def stop_sign_detection_noisy(img_in):
