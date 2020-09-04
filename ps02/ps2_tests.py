@@ -75,7 +75,7 @@ class TestTrafficLight(unittest.TestCase):
             coords, state = ps2.traffic_light_detection(test_image,
                                                         radii_range)
 
-            check_result(tl, coords, (tl_data["x"], tl_data["y"]), 5)
+            check_result(tl, coords, (tl_data["x"], tl_data["y"]), 10)
             self.assertEqual(state, tl_data["state"], "Wrong state value.")
 
     def test_scene_tl(self):
@@ -97,7 +97,7 @@ class TestTrafficLight(unittest.TestCase):
             coords, state = ps2.traffic_light_detection(test_image,
                                                         radii_range)
 
-            check_result(tl, coords, (tl_data["x"], tl_data["y"]), 5)
+            check_result(tl, coords, (tl_data["x"], tl_data["y"]), 10)
             self.assertEqual(state, tl_data["state"], "Wrong state value.")
 
 
@@ -117,35 +117,35 @@ class TestTrafficSignsBlank(unittest.TestCase):
 
         print(coords)
 
-        check_result(image_name, coords, (149, 249), 5)
+        check_result(image_name, coords, (149, 249), 10)
 
     def test_construction_sign(self):
         image_name = "construction_150_200_blank.png"
         test_image = cv2.imread("input_images/test_images/" + image_name)
         coords = ps2.construction_sign_detection(test_image)
 
-        check_result("construction_150_200_blank", coords, (200, 150), 5)
+        check_result("construction_150_200_blank", coords, (200, 150), 10)
 
     def test_warning_sign(self):
         image_name = "warning_250_300_blank.png"
         test_image = cv2.imread("input_images/test_images/" + image_name)
         coords = ps2.warning_sign_detection(test_image)
 
-        check_result(image_name, coords, (300, 250), 5)
+        check_result(image_name, coords, (300, 250), 10)
 
     def test_do_not_enter_sign(self):
         image_name = "no_entry_145_145_blank.png"
         test_image = cv2.imread("input_images/test_images/" + image_name)
         coords = ps2.do_not_enter_sign_detection(test_image)
 
-        check_result(image_name, coords, (145, 145), 5)
+        check_result(image_name, coords, (145, 145), 10)
 
     def test_yield_sign(self):
         image_name = "yield_173_358_blank.png"
         test_image = cv2.imread("input_images/test_images/" + image_name)
         coords = ps2.yield_sign_detection(test_image)
 
-        check_result(image_name, coords, (358, 173), 5)
+        check_result(image_name, coords, (358, 173), 10)
 
 
 class TestTrafficSignsScene(unittest.TestCase):
@@ -162,35 +162,35 @@ class TestTrafficSignsScene(unittest.TestCase):
         test_image = cv2.imread("input_images/test_images/" + image_name)
         coords = ps2.stop_sign_detection(test_image)
 
-        check_result(image_name, coords, (149, 249), 5)
+        check_result(image_name, coords, (149, 249), 10)
 
     def test_construction_sign(self):
         image_name = "construction_150_200_background.png"
         test_image = cv2.imread("input_images/test_images/" + image_name)
         coords = ps2.construction_sign_detection(test_image)
 
-        check_result("construction_150_200_blank", coords, (200, 150), 5)
+        check_result("construction_150_200_blank", coords, (200, 150), 10)
 
     def test_warning_sign(self):
         image_name = "warning_250_300_background.png"
         test_image = cv2.imread("input_images/test_images/" + image_name)
         coords = ps2.warning_sign_detection(test_image)
 
-        check_result(image_name, coords, (300, 250), 5)
+        check_result(image_name, coords, (300, 250), 10)
 
     def test_do_not_enter_sign(self):
         image_name = "no_entry_145_145_background.png"
         test_image = cv2.imread("input_images/test_images/" + image_name)
         coords = ps2.do_not_enter_sign_detection(test_image)
 
-        check_result(image_name, coords, (145, 145), 5)
+        check_result(image_name, coords, (145, 145), 10)
 
     def test_yield_sign(self):
         image_name = "yield_173_358_background.png"
         test_image = cv2.imread("input_images/test_images/" + image_name)
         coords = ps2.yield_sign_detection(test_image)
 
-        check_result(image_name, coords, (358, 173), 5)
+        check_result(image_name, coords, (358, 173), 10)
 
 
 if __name__ == "__main__":
