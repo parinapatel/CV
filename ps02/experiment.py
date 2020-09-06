@@ -42,7 +42,6 @@ def draw_tl_center(image_in, center, state):
     x,y=int(center[0]), int(center[1])
     text = "(({},{}),'{}')".format(y,x, state)
     xs, ys = image_in.shape[0], image_in.shape[1]
-    #orgx = x+50 if x+50+200<xs else x-10
     orgx = x + 50
     orgy = y
 
@@ -75,30 +74,18 @@ def mark_traffic_signs(image_in, signs_dict):
     """
     img = image_in.copy()
     i = 0
-    #
-    # sh = img.shape
-    #
-    # print("this is x {}".format(sh[0]))
-    # for i in range(1, sh[0] - 1, 100):
-    #     cv2.putText(img, "*", (50, i), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0), thickness=2)
-    # #show_img("x", tl_draw)
-    #
-    # print("this is y {}".format(sh[1]))
-    # for i in range(1, sh[1] - 1, 100):
-    #     cv2.putText(img, "*", (i, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0), thickness=2)
-    #
-    # #show_img("y", tl_draw)
+    signs = sorted(signs_dict.items(), key=lambda x:x[1][0])
 
-    for sign_name, center in signs_dict.items():
+    for sign_name, center in signs:
         x, y = int(center[0]), int(center[1])
         text = "(({},{}),'{}')".format(y,x, sign_name)
         xs, ys = image_in.shape[0], image_in.shape[1]
-        orgx = x if x + 70 < xs else x - 100
+        orgx = x if x + 80 < xs else x - 150
         if i%2 == 0:
             orgy = y - 60
         else:
             orgy = y + 60
-        cv2.putText(img, text, (orgx, orgy), cv2.FONT_HERSHEY_SIMPLEX, .5, (0, 0, 0))
+        cv2.putText(img, text, (orgx, orgy), cv2.FONT_HERSHEY_SIMPLEX, .5, (0, 0, 0), thickness=2)
         cv2.putText(img, "*", (x - 8, y + 9), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0), thickness=2)
         i += 1
     return img
@@ -108,10 +95,6 @@ def part_1():
 
     input_images = ['simple_tl', 'scene_tl_1', 'scene_tl_2', 'scene_tl_3']
     output_labels = ['ps2-1-a-1', 'ps2-1-a-2', 'ps2-1-a-3', 'ps2-1-a-4']
-
-    input_images = ['scene_tl_failing']
-    output_labels = ['test_failing']
-
 
     # Define a radii range, you may define a smaller range based on your
     # observations.
@@ -138,14 +121,6 @@ def part_2():
                 ps2.yield_sign_detection]
 
     sign_labels = ['no_entry', 'stop', 'construction', 'warning', 'yield']
-    #
-    # input_images = ['test_images/construction_150_200_background']
-    #
-    # output_labels = ["temp"]
-    #
-    # sign_fns = [ps2.construction_sign_detection]
-    #
-    # # sign_labels = ["stop"]
 
     for img_in, label, fn, name in zip(input_images, output_labels, sign_fns,
                                        sign_labels):
@@ -178,23 +153,18 @@ def part_4():
     for img_in, label in zip(input_images, output_labels):
         scene = cv2.imread("input_images/{}.png".format(img_in))
         coords = ps2.traffic_sign_detection_noisy(scene)
-
+        print(coords)
         img_out = mark_traffic_signs(scene, coords)
         cv2.imwrite("{}.png".format(label), img_out)
+
 
 
 def part_5a():
     input_images = ['img-5-a-1', 'img-5-a-2', 'img-5-a-3']
     output_labels = ['ps2-5-a-1', 'ps2-5-a-2', 'ps2-5-a-3']
-    # #input_images = ['yield_sign_ss.jpg',"construction_1.jpg"]
-    # input_images = ['w1.png']
-    # #output_labels = ['check_yield', "check_construction"]
-    # output_labels = ["check_warning"]
     for img_in, label in zip(input_images, output_labels):
         scene = cv2.imread("input_images/{}.png".format(img_in))
-        #scene = cv2.imread("input_images/{}".format(img_in))
         coords = ps2.traffic_sign_detection_challenge(scene)
-        print(coords)
 
         img_out = mark_traffic_signs(scene, coords)
         cv2.imwrite("{}.png".format(label), img_out)
@@ -216,5 +186,5 @@ if __name__ == '__main__':
     part_2()
     part_3()
     part_4()
-    #part_5a()
-    #part_5b()
+    part_5a()
+    part_5b()

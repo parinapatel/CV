@@ -33,6 +33,22 @@ def draw_lines(lines, img):
             cv2.line(img, (x1, y1), (x2, y2), (0, 0, 255), 2)
 
 
+def draw_lines_re(lines, img):
+    for line in lines:
+        rho = line[0]
+        theta = line[1]
+        a = np.cos(theta)
+        b = np.sin(theta)
+        x0 = a * rho
+        y0 = b * rho
+        x1 = int(x0 + 1000 * (-b))
+        y1 = int(y0 + 1000 * (a))
+        x2 = int(x0 - 1000 * (-b))
+        y2 = int(y0 - 1000 * (a))
+
+        cv2.line(img, (x1, y1), (x2, y2), (0, 0, 255), 10)
+
+
 def draw_circles(circles, img):
     for i in circles[0, :]:
         center = (i[0], i[1])
@@ -144,6 +160,7 @@ def get_diamonds(lines):
 
 
 def pt_in_circle(c, r, p):
+
     if (c[0] - r < p[0] < c[0] + r) and (c[1] -  r < p[1] < c[1] + r):
         return True
     return False
@@ -166,6 +183,163 @@ def get_lines_in_circles(lines, circles):
                 if not placed:
                     linesIn.append({"cir": tuple(circle), "l": set({tuple(line)})})
     return linesIn
+
+def angle_in_thr(val, angles, thr):
+    for angle in angles:
+        if abs(val-angle) < thr:
+            return True
+    return False
+
+def find_construction_sign(mask, img_in):
+    """Finds the centroid coordinates of a construction sign in the
+    provided image.
+
+    Args:
+        img_in (numpy.array): image containing a traffic light.
+
+    Returns:
+        (x,y) tuple of the coordinates of the center of the sign.
+    """
+    sign_draw = mask.copy()
+
+    edges = cv2.Canny(mask, 100, 200)
+
+    lines = cv2.HoughLinesP(edges, rho=1, theta=np.pi / 36, threshold=20, minLineLength=5, maxLineGap=5)
+    if (len(lines)) == 0:
+        return 0, 0
+    lines = lines.reshape(lines.shape[0], lines.shape[2])
+
+    lengths = [int(get_length(line)) for line in lines]
+    std = np.std(lengths)
+    meanl = np.mean(lengths)
+    #print(sorted(lengths))
+
+    lines = [line for line in lines  if (150 < get_length(line) < 250) ]
+
+    l45 = filter_angles(lines, [45])
+    l_45 = filter_angles(lines, [-45])
+
+    # for line in lines:
+    #     cv2.line(img_in, (line[0],line[1]), (line[2], line[3]), (0,0,0), 2)
+    # for line in l_45:
+    #     cv2.line(img_in, (line[0],line[1]), (line[2], line[3]), (0,0,0), 2)
+    # show_img("lines", img_in)
+
+
+    diamonds = get_diamonds(lines)
+    if len(diamonds) == 0:
+        print("no diamonds")
+        return 0, 0
+
+    for diamond in diamonds:
+        lines = diamond["lines"]
+        centerx = np.mean([c[0] for c in diamond["common"]])
+        centery = np.mean([c[1] for c in diamond["common"]])
+        return int(centerx), int(centery)
+
+    return 0, 0
+
+def find_warning_sign(mask, img_in):
+    """Finds the centroid coordinates of a construction sign in the
+    provided image.
+
+    Args:
+        img_in (numpy.array): image containing a traffic light.
+
+    Returns:
+        (x,y) tuple of the coordinates of the center of the sign.
+    """
+    sign_draw = mask.copy()
+
+    edges = cv2.Canny(mask, 100, 200)
+
+    lines = cv2.HoughLinesP(edges, rho=1, theta=np.pi / 36, threshold=20, minLineLength=5, maxLineGap=5)
+    if lines is None:
+        return 0,0
+    if (len(lines)) == 0:
+        return 0, 0
+    lines = lines.reshape(lines.shape[0], lines.shape[2])
+
+    lengths = [int(get_length(line)) for line in lines]
+    std = np.std(lengths)
+    meanl = np.mean(lengths)
+    #print(sorted(lengths))
+
+    lines = [line for line in lines]
+
+    l45 = filter_angles(lines, range(40, 51 ,1))
+    l_45 = filter_angles(lines, range(-50,-39,-1))
+
+    for line in lines:
+        cv2.line(img_in, (line[0],line[1]), (line[2], line[3]), (0,0,0), 2)
+    show_img("lines", img_in)
+
+
+    diamonds = get_diamonds(lines)
+    if len(diamonds) == 0:
+        print("no diamonds")
+        return 0, 0
+
+    for diamond in diamonds:
+        lines = diamond["lines"]
+        centerx = np.mean([c[0] for c in diamond["common"]])
+        centery = np.mean([c[1] for c in diamond["common"]])
+        return int(centerx), int(centery)
+
+    return 0, 0
+
+def find_yield_sign(img_in, real):
+    """Finds the centroid coordinates of a yield sign in the provided
+    image.
+
+    Args:
+        img_in (numpy.array): image containing a traffic light.
+
+    Returns:
+        (x,y) tuple of coordinates of the center of the yield sign.
+    """
+    sign_draw = img_in.copy()
+    edges = cv2.Canny(sign_draw, 100, 200)
+    #show_img(sign_draw)
+    lines = cv2.HoughLinesP(edges, rho=1, theta=np.pi / 36, threshold=20, minLineLength=5, maxLineGap=5)
+    if (len(lines)) == 0:
+        return 0, 0
+    lines = lines.reshape(lines.shape[0], lines.shape[2])
+
+    # filter lines with 0, +60 and -60 angles
+    side_60 = filter_angles(lines, range(55,66,1))
+    side__60 = filter_angles(lines, range(-55, -66,-1))
+
+    # for line in side_60:
+    #     cv2.line(real, (line[0],line[1]), (line[2], line[3]), (0,0,0), 2)
+    # for line in side__60:
+    #     cv2.line(real, (line[0],line[1]), (line[2], line[3]), (0,0,0), 2)
+    # show_img("lines", real)
+    triangle = []
+
+    """
+    find two lines at 60 and -60 angles, which are almost connected - they will be the angular lines
+    put the three points found by these two lines in a set. Check the set of triangles to find the center.
+    """
+    for s60 in side_60:
+        s60_1 = [s60[0], s60[1]]
+        s60_2 = [s60[2], s60[3]]
+        s60_low, s60_up = (s60_1, s60_2) if s60_1[1] > s60_2[1] else (s60_2, s60_1)
+        for s_60 in side__60:
+            s_60_1 = [s_60[0], s_60[1]]
+            s_60_2 = [s_60[2], s_60[3]]
+            s_60_low, s_60_up = (s_60_1, s_60_2) if s_60_1[1] > s_60_2[1] else (s_60_2, s_60_1)
+            if (abs(s60_low[0] - s_60_low[0]) < 15 and abs(s60_low[1] - s_60_low[1]) < 15):
+                mid_pt = [(s60_low[0] + s_60_low[0]) / 2, (s60_low[1] + s_60_low[1]) / 2]
+                triangle.append([s60_up, mid_pt, s_60_up])
+
+    if len(triangle) == 0:
+      return 0, 0
+
+    x = np.mean([np.mean([s[0] for s in tri]) for tri in triangle])
+    y = np.mean([np.mean([s[1] for s in tri]) for tri in triangle])
+
+    return int(x), int(y)
 
 
 def traffic_light_detection(img_in, radii_range):
@@ -238,6 +412,7 @@ def traffic_light_detection(img_in, radii_range):
         circles = cv2.HoughCircles(edges, cv2.HOUGH_GRADIENT, 1, 20,
                                    param1=15, param2=20,
                                    minRadius=max(5, min(radii_range) - 5), maxRadius=min(50, max(radii_range) + 10))
+        #print(circles)
         if circles is None: return (0,0),""
 
         cshape = circles.shape
@@ -363,20 +538,20 @@ def stop_sign_detection(img_in):
     Returns:
         (x,y) tuple of the coordinates of the center of the stop sign.
     """
-    sign= img_in.copy()
+    sign = img_in.copy()
     img_hsv = cv2.cvtColor(img_in, cv2.COLOR_BGR2HSV)
     lower = np.array([0, 43, 46])
     upper = np.array([10, 255, 230])
     sign_draw = cv2.inRange(img_hsv, lower, upper)
     edges = cv2.Canny(sign_draw, 100, 200)
-    #show_img("edges of tl", edges)
+    # show_img("edges of tl", edges)
 
     lines = cv2.HoughLinesP(edges, rho=1, theta=np.pi / 36, threshold=20, minLineLength=5, maxLineGap=5)
     if (len(lines)) == 0:
         return 0, 0
     lines = lines.reshape(lines.shape[0], lines.shape[2])
 
-    print(len(lines))
+    # print(len(lines))
 
     #show_img("", edges)
 
@@ -445,8 +620,9 @@ def stop_sign_detection(img_in):
         if len(o["lines"]) >= 3:
             fo["lines"] = fo["lines"].union(o["lines"])
             fo["common"] = fo["common"].union(o["common"])
-    print(len(fo["lines"]))
-
+    # print(len(fo["lines"]))
+    # show_img("", edges)
+    # cv2.destroyAllWindows()
     points = list(fo["common"])
     pd = list([0 for i in range(len(fo["common"]))])
 
@@ -458,7 +634,7 @@ def stop_sign_detection(img_in):
                 pd[j] = 1
     #print(pd)
 
-    centerx = int(np.mean([points[i][0] for i in range(len(points)) if pd[i] == 0]))
+    centerx = int(np.mean([points[i][0] for i in range(len(points)) if pd[i] == 0]))-6
     centery = int(np.mean([points[i][1] for i in range(len(points)) if pd[i] == 0]))
 
     area = sign[centery - 5:centery + 5, centerx - 5:centerx + 5]
@@ -562,6 +738,9 @@ def stop_sign_detection_noisy(img_in):
     # show_img("", edges)
     # cv2.destroyAllWindows()
     points = list(fo["common"])
+    if len(points) == 0:
+        return 0,0
+
     pd = list([0 for i in range(len(fo["common"]))])
 
     for i in range(len(points)):
@@ -570,7 +749,6 @@ def stop_sign_detection_noisy(img_in):
         for j in range(i + 1, len(distances)):
             if pd[j] == 0 and distances[j]:
                 pd[j] = 1
-    #print(pd)
 
     centerx = int(np.mean([points[i][0] for i in range(len(points)) if pd[i] == 0]))
     centery = int(np.mean([points[i][1] for i in range(len(points)) if pd[i] == 0]))
@@ -707,9 +885,6 @@ def do_not_enter_sign_detection(img_in):
     return 0, 0
 
 
-
-
-
 def traffic_sign_detection(img_in):
     """Finds all traffic signs in a synthetic image.
 
@@ -821,11 +996,137 @@ def traffic_sign_detection_challenge(img_in):
               These are just example values and may not represent a
               valid scene.
     """
-    blurred = cv2.GaussianBlur(img_in, (15, 15), 0)
-    #show_img("blurred", blurred)
+    signs = ["traffic_light", "no_entry", "stop", "warning", "yield", "construction"]
+    blurred = cv2.GaussianBlur(img_in, (5, 5), 0)
     denoised = cv2.fastNlMeansDenoisingColored(blurred, None, 10, 10, 7, 21)
     #show_img("denoised", denoised)
-    edges = cv2.Canny(denoised, 100, 200)
-    #show_img("edges", edges)
-    signs = traffic_sign_detection(denoised)
-    return signs
+    all_signs = {}
+    for sign in signs:
+        if sign == "traffic_light":
+            c = traffic_light_detection(denoised, range(60, 100, 1))[0]
+            if c != (0,0):
+                all_signs[sign] = c
+
+        if sign == "no_entry":
+            # By adding the mask, it just gets you the circle and there is no need to check further
+            img_hsv = cv2.cvtColor(denoised, cv2.COLOR_BGR2HSV)
+            lower = np.array([156, 43, 200])  # example value
+            upper = np.array([180, 255, 255])  # example value
+            mask0 = cv2.inRange(img_hsv, lower, upper)
+            lower = np.array([0, 43, 200])  # example value
+            upper = np.array([10, 100, 255])  # example value
+            mask1 = cv2.inRange(img_hsv, lower, upper)
+            mask = mask0 + mask1
+            edges = cv2.Canny(mask, 100, 200)
+
+            #show_img("real one", img_in)
+            #show_img("edges", edges)
+
+            circles = cv2.HoughCircles(edges, cv2.HOUGH_GRADIENT, 1, 2000, param1=80, param2=30, minRadius=50,
+                                       maxRadius=130)
+            if circles is None:
+                continue
+
+            circles = np.uint16(np.around(circles))
+            cshape = circles.shape
+            centers = circles.reshape(cshape[1], cshape[2])
+
+            if len(centers) > 0:
+                x = centers[0][0]
+                y = centers[0][1]
+                center = (x, y)
+                #cv2.putText(img_in, "*", center, cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0), thickness=2)
+                #show_img("final", img_in)
+
+            if center != (0,0):
+                all_signs[sign] = center
+
+        if sign == "stop":
+            c = stop_sign_detection_noisy(denoised)
+            if c != (0,0):
+                all_signs[sign] = c
+
+        if sign == "warning":
+            blurred = cv2.GaussianBlur(img_in, (5, 5), 0)
+            denoised = cv2.fastNlMeansDenoisingColored(blurred, None, 10, 10, 7, 21)
+
+            img_hsv = cv2.cvtColor(blurred, cv2.COLOR_BGR2HSV)
+            lower = np.array([20, 40, 60])  # example value
+            upper = np.array([40, 255, 255])  # example value
+            mask = cv2.inRange(img_hsv, lower, upper)
+            edges = cv2.Canny(mask, 100, 200)
+            #show_img("edges of mask", edges)
+
+            # get relevant lines
+            lines = cv2.HoughLines(edges, 1, np.pi / 72, 100)
+            if lines is None:
+                continue
+            if len(lines) == 0:
+                continue
+
+            lines = lines.reshape(lines.shape[0], lines.shape[2])
+            a45 = round(np.pi / 4, 3)
+            a135 = round(np.pi - (np.pi / 4), 3)
+            lines_1 = np.array(
+                [[round(line[0], 3), round(line[1], 3)] for line in lines if angle_in_thr(line[1], [a45, a135], 0.05)])
+            #print(lines_1)
+            if lines_1 is None:
+                continue
+            if len(lines_1) == 0:
+                continue
+            # create a blank image with lines in it
+            blank_image = np.zeros(img_in.shape, np.uint8)
+            draw_lines_re(lines_1, blank_image)
+            center = find_warning_sign(blank_image, img_in)
+
+            if center != (0,0):
+                all_signs[sign] = center
+
+        if sign == "yield":
+            blurred = cv2.GaussianBlur(img_in, (15, 15), 0)
+
+            c = find_yield_sign(blurred, img_in)
+            if c != (0,0):
+                all_signs[sign] = c
+
+        if sign == "construction":
+            blurred = cv2.GaussianBlur(img_in, (5, 5), 0)
+            denoised = cv2.fastNlMeansDenoisingColored(blurred, None, 10, 10, 7, 21)
+            #show_img("denoised", denoised)
+
+            img_hsv = cv2.cvtColor(denoised, cv2.COLOR_BGR2HSV)
+            lower = np.array([0, 43, 46])  # example value
+            upper = np.array([10, 255, 255])  # example value
+            mask = cv2.inRange(img_hsv, lower, upper)
+            #show_img("mask", mask)
+            #     mask=generate_mask(img_in, [0,128,255])
+            edges = cv2.Canny(mask, 100, 200)
+            #show_img("edges of mask", edges)
+
+            # get relevant lines
+            lines = cv2.HoughLines(edges, 1, np.pi / 36, 100)
+
+            if lines is None:
+                continue
+
+            if len(lines) == 0:
+                continue
+
+            lines = lines.reshape(lines.shape[0], lines.shape[2])
+            a45 = round(np.pi / 4, 3)
+            a135 = round(np.pi - (np.pi / 4), 3)
+            lines_1 = np.array(
+                [[round(line[0], 3), round(line[1], 3)] for line in lines if angle_in_thr(line[1], [a45, a135], 0.05)])
+            #print(lines_1)
+
+            if len(lines_1) == 0:
+                continue
+
+            # create a blank image with lines in it
+            blank_image = np.zeros(img_in.shape, np.uint8)
+            draw_lines_re(lines_1, blank_image)
+
+            center = find_construction_sign(blank_image, img_in)
+            if center != (0,0):
+                all_signs[sign] = center
+    return all_signs
