@@ -16,7 +16,7 @@ def euclidean_distance(p0, p1):
         float: The distance between points
     """
 
-    raise NotImplementedError
+    return np.linalg.norm(np.array(p0) - np.array(p1))
 
 
 def get_corners_list(image):
@@ -51,7 +51,32 @@ def find_markers(image, template=None):
             in the order [top-left, bottom-left, top-right, bottom-right].
     """
 
-    raise NotImplementedError
+    blurred = cv2.GaussianBlur(image, (5,5), 0)
+    gray = cv2.cvtColor(blurred, cv2.COLOR_BGR2GRAY)
+
+    dst = cv2.cornerHarris(gray, 2, 3, 0.04)
+    xy = np.where(dst > 0.2 * np.max(dst))
+    locations = np.array([(xy[1][i], xy[0][i]) for i in range(len(xy[0]))], dtype=np.float32)
+
+    # h, w = image.shape[0], image.shape[1]
+    #
+    # img_corners = [(0, 0),
+    #                (h - 1, 0),
+    #                (0, w - 1),
+    #                (h - 1, w - 1)]
+    # for corner in img_corners:
+    #     locations = [location for location in locations if euclidean_distance(location, corner) > 10]
+
+    criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 10, 1.0)
+    flags = cv2.KMEANS_PP_CENTERS
+
+    _, _, centers = cv2.kmeans(locations, 4, None, criteria, 100, flags)
+
+    markers = []
+    for center in centers:
+        c = tuple([np.uint(center[0]), np.uint(center[1])])
+        markers.append(c)
+    return markers
 
 
 def draw_box(image, markers, thickness=1):
