@@ -70,15 +70,6 @@ def find_markers(image, template=None):
     xy = np.where(dst > 0.1 * np.max(dst))
     locations = np.array([(xy[1][i], xy[0][i]) for i in range(len(xy[0]))], dtype=np.float32)
 
-    # h, w = image.shape[0], image.shape[1]
-    #
-    # img_corners = [(0, 0),
-    #                (h - 1, 0),
-    #                (0, w - 1),
-    #                (h - 1, w - 1)]
-    # for corner in img_corners:
-    #     locations = [location for location in locations if euclidean_distance(location, corner) > 10]
-
     criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 10, 1.0)
     flags = cv2.KMEANS_PP_CENTERS
     _, _, centers = cv2.kmeans(locations, 4, None, criteria, 100, flags)
@@ -102,7 +93,7 @@ def find_markers(image, template=None):
     markers.append(p2)
     markers.append(p4)
     markers.append(p3)
-    print(markers)
+
     return markers
 
 
@@ -159,7 +150,36 @@ def project_imageA_onto_imageB(imageA, imageB, homography):
         numpy.array: combined image
     """
 
-    raise NotImplementedError
+    copyA = imageA.copy()
+    copyB = imageB.copy()
+
+    h, w = copyA.shape[:2]
+    H, W = copyB.shape[:2]
+
+    # Make an array of all source points in homogenous coordinates
+    A = np.zeros((3, h * w), np.uint32)
+    for x in range(w):
+        subArr = np.array([np.array([x for i in range(h)]), np.arange(h), np.ones(h)])
+        A[:, x * h:(x + 1) * h] = subArr
+
+    # Dot product with homography and convert to homogenous coordinates
+    B = np.dot(homography, A)
+    for i in range(3):
+        B[i, :] /= B[2, :]
+
+    # make the destination values to be in the range for an image
+    B = B.astype(int)
+    B[0, :] = np.clip(B[0, :], 0, W - 1)
+    B[1, :] = np.clip(B[1, :], 0, H - 1)
+
+    # put the source in the destination
+    copyB[B[1, :], B[0, :], :] = copyA[A[1, :], A[0, :], :]
+
+    return copyB
+
+
+
+
 
 
 def find_four_point_transform(src_points, dst_points):
@@ -182,7 +202,19 @@ def find_four_point_transform(src_points, dst_points):
         numpy.array: 3 by 3 homography matrix of floating point values.
     """
 
-    raise NotImplementedError
+    src = []
+    dst = []
+    for i in range(len(src_points)):
+        s1, s2 = src_points[i][0], src_points[i][1]
+        d1, d2 = dst_points[i][0], dst_points[i][1]
+        src.extend([[s1,s2,1, 0,0,0, -d1*s1, -d1*s2],[0,0,0, s1,s2,1, -d2*s1, -d2*s2]])
+        dst.extend([[d1],[d2]])
+
+    H, _, _, _ = np.linalg.lstsq(np.array(src),np.array(dst), rcond=None)
+    H = np.append(H,1)
+
+    return H.reshape(3,3)
+
 
 
 def video_frame_generator(filename):
