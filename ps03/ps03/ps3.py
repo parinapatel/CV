@@ -3,10 +3,12 @@ CS6476 Problem Set 3 imports. Only Numpy and cv2 are allowed.
 """
 import cv2
 import numpy as np
+from scipy import ndimage
 
 def show_img(str, img):
     cv2.imshow(str, img)
     cv2.waitKey(0)
+
 
 def euclidean_distance(p0, p1):
     """Gets the distance between two (x,y) points
@@ -60,25 +62,54 @@ def find_markers(image, template=None):
         list: List of four (x, y) tuples
             in the order [top-left, bottom-left, top-right, bottom-right].
     """
+    img = image.copy()
+    corner_img = image.copy()
 
     blurred = cv2.GaussianBlur(image, (5,5), 0)
     denoised = cv2.fastNlMeansDenoisingColored(blurred, None, 10, 10, 7, 21)
     gray = cv2.cvtColor(denoised, cv2.COLOR_BGR2GRAY)
 
-    dst = cv2.cornerHarris(gray, 10, 3, 0.04)
+    dst = cv2.cornerHarris(gray, 5, 7, 0.01)
+    corner_img[dst > 0.02 * dst.max()] = [0, 0, 255]
 
-    xy = np.where(dst > 0.1 * np.max(dst))
-    locations = np.array([(xy[1][i], xy[0][i]) for i in range(len(xy[0]))], dtype=np.float32)
+    if template is not None:
 
-    criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 10, 1.0)
-    flags = cv2.KMEANS_PP_CENTERS
-    _, _, centers = cv2.kmeans(locations, 4, None, criteria, 100, flags)
+        #find the max heatmap for the template
+        max_resemblance = 0
+        max_heatmap = None
+        for degree in range(0, 180, 5):
+            rotated_template = ndimage.interpolation.rotate(template, degree, mode='constant', reshape=False)
+            heatmap = cv2.matchTemplate(img, rotated_template, cv2.TM_CCOEFF_NORMED)
+            if heatmap.max() > max_resemblance:
+                max_resemblance = heatmap.max()
+                max_heatmap = heatmap
 
-    markers = []
-    for center in centers:
-        c = tuple([np.uint(center[0]), np.uint(center[1])])
-        markers.append(c)
+        #compare if the heatmap values coincide with the harris corner detection
+        markers = []
+        while len(markers) < 4:
+            _, _, _, max_loc = cv2.minMaxLoc(max_heatmap)
+            max_heatmap[max_loc[1], max_loc[0]] = 0
+            center_pt = (max_loc[0] + template.shape[0]//2, max_loc[1] + template.shape[1]//2)
+            check_distance = True
+            for pt in markers:
+                if euclidean_distance(pt, center_pt) < 5:
+                    check_distance = False
+            if check_distance and corner_img[center_pt[1], center_pt[0],2] > 250:
+                markers.append(center_pt)
 
+    else:
+
+        xy = np.where(dst > 0.1 * np.max(dst))
+        locations = np.array([(xy[1][i], xy[0][i]) for i in range(len(xy[0]))], dtype=np.float32)
+
+        criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 10, 1.0)
+        flags = cv2.KMEANS_PP_CENTERS
+        _, _, centers = cv2.kmeans(locations, 4, None, criteria, 100, flags)
+
+        markers = []
+        for center in centers:
+            c = tuple([np.uint(center[0]), np.uint(center[1])])
+            markers.append(c)
 
     markers.sort(key=lambda x: x[0])
     left = markers[:2]
@@ -178,10 +209,6 @@ def project_imageA_onto_imageB(imageA, imageB, homography):
     return copyB
 
 
-
-
-
-
 def find_four_point_transform(src_points, dst_points):
     """Solves for and returns a perspective transform.
 
@@ -212,8 +239,16 @@ def find_four_point_transform(src_points, dst_points):
 
     H, _, _, _ = np.linalg.lstsq(np.array(src),np.array(dst), rcond=None)
     H = np.append(H,1)
+    H = H.reshape(3,3)
 
-    return H.reshape(3,3)
+    # markers = []
+    # for pt in src_points:
+    #     new_pt = np.dot(H, [[pt[0]],[pt[1]],[1]])
+    #     markers.append((int(new_pt[0]),int(new_pt[1])))
+    #
+    # print("source: {}\n dst:{}\n markers:{}".format(src_points, dst_points, markers))
+
+    return H
 
 
 

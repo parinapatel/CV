@@ -7,7 +7,6 @@ implementation and output images so you can verify your results.
 import os
 import cv2
 import numpy as np
-
 import ps3
 
 
