@@ -634,7 +634,7 @@ def stop_sign_detection(img_in):
                 pd[j] = 1
     #print(pd)
 
-    centerx = int(np.mean([points[i][0] for i in range(len(points)) if pd[i] == 0]))-6
+    centerx = int(np.mean([points[i][0] for i in range(len(points)) if pd[i] == 0]))
     centery = int(np.mean([points[i][1] for i in range(len(points)) if pd[i] == 0]))
 
     area = sign[centery - 5:centery + 5, centerx - 5:centerx + 5]

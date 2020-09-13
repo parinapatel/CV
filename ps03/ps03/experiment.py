@@ -22,6 +22,7 @@ def helper_for_part_4_and_5(video_name, fps, frame_ids, output_prefix,
                             counter_init, is_part5):
 
     video = os.path.join(VID_DIR, video_name)
+    frames = int(cv2.VideoCapture(video).get(cv2.CAP_PROP_FRAME_COUNT))
     image_gen = ps3.video_frame_generator(video)
 
     image = image_gen.__next__()
@@ -43,7 +44,7 @@ def helper_for_part_4_and_5(video_name, fps, frame_ids, output_prefix,
 
     while image is not None:
 
-        print("Processing fame {}".format(frame_num))
+        print("Processing frame {}/{}".format(frame_num,frames))
 
         markers = ps3.find_markers(image, template)
 
