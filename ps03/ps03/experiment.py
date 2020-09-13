@@ -115,8 +115,15 @@ def part_1():
                     'sim_noisy_scene_2.jpg']
     output_images = ['ps3-1-a-1.png', 'ps3-1-a-2.png', 'ps3-1-a-3.png']
 
+    input_images = ['rectangle_wall.png', 'rectangle_wall_noisy.png',
+                  'rectangle_wall_noisy_gaussian.png']
+    output_images = ['t1_1.png', 't1_2.png', 't1_3.png']
+
+    IMG_DIR = "input_images/test_images"
+
     # Optional template image
-    template = cv2.imread(os.path.join(IMG_DIR, "template.jpg"))
+    #template = cv2.imread(os.path.join(IMG_DIR, "template.jpg"))
+    template = cv2.imread("./input_images/template.jpg")
 
     for img_in, img_out in zip(input_images, output_images):
 
@@ -273,10 +280,10 @@ if __name__ == '__main__':
     # Comment out the sections you want to skip
 
     part_1()
-    part_2()
-    part_3()
-    part_4_a()
-    part_4_b()
-    part_5_a()
-    part_5_b()
-    part_6()
+    #part_2()
+    # part_3()
+    # part_4_a()
+    # part_4_b()
+    # part_5_a()
+    # part_5_b()
+    # part_6()

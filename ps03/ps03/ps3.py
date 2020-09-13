@@ -4,6 +4,9 @@ CS6476 Problem Set 3 imports. Only Numpy and cv2 are allowed.
 import cv2
 import numpy as np
 
+def show_img(str, img):
+    cv2.imshow(str, img)
+    cv2.waitKey(0)
 
 def euclidean_distance(p0, p1):
     """Gets the distance between two (x,y) points
@@ -33,7 +36,14 @@ def get_corners_list(image):
             in the order [top-left, bottom-left, top-right, bottom-right].
     """
 
-    raise NotImplementedError
+    h, w = image.shape[0], image.shape[1]
+
+    img_corners = [(0, 0),
+                   (0, h-1),
+                   (w-1, 0),
+                   (w - 1, h - 1)]
+
+    return img_corners
 
 
 def find_markers(image, template=None):
@@ -52,10 +62,12 @@ def find_markers(image, template=None):
     """
 
     blurred = cv2.GaussianBlur(image, (5,5), 0)
-    gray = cv2.cvtColor(blurred, cv2.COLOR_BGR2GRAY)
+    denoised = cv2.fastNlMeansDenoisingColored(blurred, None, 10, 10, 7, 21)
+    gray = cv2.cvtColor(denoised, cv2.COLOR_BGR2GRAY)
 
-    dst = cv2.cornerHarris(gray, 2, 3, 0.04)
-    xy = np.where(dst > 0.2 * np.max(dst))
+    dst = cv2.cornerHarris(gray, 10, 3, 0.04)
+
+    xy = np.where(dst > 0.1 * np.max(dst))
     locations = np.array([(xy[1][i], xy[0][i]) for i in range(len(xy[0]))], dtype=np.float32)
 
     # h, w = image.shape[0], image.shape[1]
@@ -69,13 +81,28 @@ def find_markers(image, template=None):
 
     criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 10, 1.0)
     flags = cv2.KMEANS_PP_CENTERS
-
     _, _, centers = cv2.kmeans(locations, 4, None, criteria, 100, flags)
 
     markers = []
     for center in centers:
         c = tuple([np.uint(center[0]), np.uint(center[1])])
         markers.append(c)
+
+
+    markers.sort(key=lambda x: x[0])
+    left = markers[:2]
+    right = markers[2:]
+    left.sort(key=lambda x: x[1])
+    right.sort(key=lambda x: x[1])
+
+    p1, p2, p3, p4 = left[0], left[1], right[1], right[0]
+
+    markers = []
+    markers.append(p1)
+    markers.append(p2)
+    markers.append(p4)
+    markers.append(p3)
+    print(markers)
     return markers
 
 
@@ -95,7 +122,25 @@ def draw_box(image, markers, thickness=1):
         numpy.array: image with lines drawn.
     """
 
-    raise NotImplementedError
+    corners = markers
+    markers = []
+    for marker in corners:
+        markers.append(tuple([marker[0], marker[1]]))
+
+    markers.sort(key = lambda x:x[0])
+    left = markers[:2]
+    right = markers[2:]
+    left.sort(key=lambda x:x[1])
+    right.sort(key=lambda x:x[1])
+
+    p1, p2, p3, p4 = left[0], left[1], right[1], right[0]
+
+    cv2.line(image, p1, p2, (0,0,0), thickness)
+    cv2.line(image, p2, p3, (0, 0, 0), thickness)
+    cv2.line(image, p3, p4, (0, 0, 0), thickness)
+    cv2.line(image, p4, p1, (0, 0, 0), thickness)
+
+    return image
 
 
 def project_imageA_onto_imageB(imageA, imageB, homography):
@@ -152,7 +197,7 @@ def video_frame_generator(filename):
         None.
     """
     # Todo: Open file with VideoCapture and set result to 'video'. Replace None
-    video = None
+    video = cv2.VideoCapture(filename)
 
     # Do not edit this while loop
     while video.isOpened():
@@ -164,4 +209,5 @@ def video_frame_generator(filename):
             break
 
     # Todo: Close video (release) and yield a 'None' value. (add 2 lines)
-    raise NotImplementedError
+    video.release()
+    yield None

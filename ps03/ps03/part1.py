@@ -26,17 +26,25 @@ def draw_circles(circles, img):
         radius = i[2]
         cv2.circle(img, center, radius, (255, 0, 255), 3)
 
+
+
+
+
+
+
+"""
 img = cv2.imread("./input_images/sim_clear_scene.jpg")
-img = cv2.imread("./input_images/sim_noisy_scene_2.jpg")
+img = cv2.imread("./input_images/ps3-2-a_base.jpg")
+img = cv2.imread("./input_images/test_images/simple_rectangle_noisy_gaussian.png")
 blurred = cv2.GaussianBlur(img, (5,5), 0)
-#blurred = cv2.medianBlur(blurred,5)
-gray = cv2.cvtColor(blurred, cv2.COLOR_BGR2GRAY)
+blurred = cv2.medianBlur(blurred,5)
+denoised = cv2.fastNlMeansDenoisingColored(blurred, None, 10, 10, 7, 21)
+gray = cv2.cvtColor(denoised, cv2.COLOR_BGR2GRAY)
 
 show_img("gray", gray)
 
-"""
-Detect Harris Corners and get their locations
-"""
+
+
 dst = cv2.cornerHarris(gray,2,3,0.04)
 xy = np.where(dst > 0.2*np.max(dst))
 locations = [(xy[1][i], xy[0][i]) for i in range(len(xy[0]))]
@@ -44,9 +52,7 @@ locations = [(xy[1][i], xy[0][i]) for i in range(len(xy[0]))]
 
 img[dst>0.01*dst.max()]=[0,0,255]
 show_img("corners", img)
-"""
-add whether the corners are near the ends of images or not
-"""
+
 
 h, w = img.shape[0], img.shape[1]
 
@@ -152,3 +158,4 @@ print(centers)
 # # Threshold for an optimal value, it may vary depending on the image.
 # img[dst>0.01*dst.max()]=[0,0,255]
 # show_img("corners", img)
+"""

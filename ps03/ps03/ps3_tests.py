@@ -143,7 +143,7 @@ class AssignmentTests(unittest.TestCase):
 
         markers_pos = [(197, 288), (283, 640), (979, 99), (1062, 465)]
 
-        thresh = 1
+        thresh = 2
 
         for f in file_names:
 

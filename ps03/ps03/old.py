@@ -94,7 +94,7 @@ def corners_detection_kmeans(res, threshold1, threshold2, image, verbose):
     criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 1000, 1.0)
     # criteria = (cv2.TERM_CRITERIA_EPS, 0, 1)
 
-    ret,label,centers=cv2.kmeans(locations,4,criteria,100,cv2.KMEANS_PP_CENTERS)
+    ret,label,centers=cv2.kmeans(locations,4,None,criteria,100,cv2.KMEANS_PP_CENTERS)
     A = locations[label.ravel()==0]
     B = locations[label.ravel()==1]
     C = locations[label.ravel()==2]
