@@ -157,10 +157,10 @@ def draw_box(image, markers, thickness=1):
 
     p1, p2, p3, p4 = left[0], left[1], right[1], right[0]
 
-    cv2.line(image, p1, p2, (0,0,0), thickness)
-    cv2.line(image, p2, p3, (0, 0, 0), thickness)
-    cv2.line(image, p3, p4, (0, 0, 0), thickness)
-    cv2.line(image, p4, p1, (0, 0, 0), thickness)
+    cv2.line(image, p1, p2, (0,0,255), thickness=thickness)
+    cv2.line(image, p2, p3, (0,0,255), thickness=thickness)
+    cv2.line(image, p3, p4, (0,0,255), thickness=thickness)
+    cv2.line(image, p4, p1, (0,0,255), thickness=thickness)
 
     return image
 
