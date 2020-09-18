@@ -1,7 +1,15 @@
-import cv2
-import ps3
-import numpy as np
+from multiprocessing import Process
+
+"""
+CS6476: Problem Set 3 Experiment file
+This script consists in a series of function calls that run the ps3 
+implementation and output images so you can verify your results.
+"""
+
 import os
+import cv2
+import numpy as np
+import ps3
 
 IMG_DIR = "input_images"
 VID_DIR = "input_videos"
@@ -10,62 +18,270 @@ if not os.path.isdir(OUT_DIR):
     os.makedirs(OUT_DIR)
 
 
-input_images = ['ps3-3-a_base.jpg', 'ps3-3-b_base.jpg', 'ps3-3-c_base.jpg']
-output_images = ['ps3-3-a-1.png', 'ps3-3-a-2.png', 'ps3-3-a-3.png']
+def helper_for_part_4_and_5(video_name, fps, frame_ids, output_prefix,
+                            counter_init, is_part5):
+    video = os.path.join(VID_DIR, video_name)
+    frames = int(cv2.VideoCapture(video).get(cv2.CAP_PROP_FRAME_COUNT))
+    image_gen = ps3.video_frame_generator(video)
 
-# Advertisement image
-advert = cv2.imread(os.path.join(IMG_DIR, "img-3-a-1.png"))
-src_points = ps3.get_corners_list(advert)
+    image = image_gen.__next__()
+    h, w, d = image.shape
 
-# Optional template image
-template = cv2.imread(os.path.join(IMG_DIR, "template.jpg"))
+    out_path = "ar_{}-{}".format(output_prefix[4:], video_name)
+    video_out = mp4_video_writer(out_path, (w, h), fps)
 
-for img_in, img_out in zip(input_images, output_images):
-    print("Input image: {}".format(img_in))
+    # Optional template image
+    template = cv2.imread(os.path.join(IMG_DIR, "template.jpg"))
 
-    # Open image and identify the four marker positions
-    scene = cv2.imread(os.path.join(IMG_DIR, img_in))
+    if is_part5:
+        advert = cv2.imread(os.path.join(IMG_DIR, "img-3-a-1.png"))
+        src_points = ps3.get_corners_list(advert)
 
-    markers = ps3.find_markers(scene, template)
+    output_counter = counter_init
 
-    homography = ps3.find_four_point_transform(src_points, markers)
+    frame_num = 1
 
-    imageA = advert.copy()
-    imageB = scene.copy()
-    copyA = imageA.copy()
-    copyB = imageB.copy()
+    while image is not None:
 
-    h,w = copyA.shape[:2]
-    H,W = copyB.shape[:2]
+        print("Processing frame {}/{}".format(frame_num, frames))
 
-    #Make an array of all source points in homogenous coordinates
-    A = np.zeros((3, h*w), np.uint32)
-    for x in range(w):
-        subArr = np.array([np.array([x for i in range(h)]),np.arange(h),np.ones(h)])
-        A[:,x*h:(x+1)*h] = subArr
+        markers = ps3.find_markers(image, template)
 
-    #Dot product with homography and convert to homogenous coordinates
-    B = np.dot(homography, A)
-    for i in range(3):
-        B[i, :] /= B[2, :]
+        if is_part5:
+            homography = ps3.find_four_point_transform(src_points, markers)
+            image = ps3.project_imageA_onto_imageB(advert, image, homography)
 
-    B = B.astype(int)
-    #make the destination values to be in the range for an image
-    B[0, :] = np.clip(B[0, :], 0, W-1)
-    B[1, :] = np.clip(B[1, :], 0, H - 1)
+        else:
 
-    #put the source in the destination
-    copyB[B[1,:],B[0,:],:] = copyA[A[1,:],A[0,:],:]
+            for marker in markers:
+                mark_location(image, marker)
 
+        frame_id = frame_ids[(output_counter - 1) % 3]
 
+        if frame_num == frame_id:
+            out_str = output_prefix + "-{}.png".format(output_counter)
+            save_image(out_str, image)
+            output_counter += 1
 
+        video_out.write(image)
 
+        image = image_gen.__next__()
 
+        frame_num += 1
 
-
-    #first row of src is x, second row is y and third row is 1
+    video_out.release()
 
 
+def mp4_video_writer(filename, frame_size, fps=20):
+    """Opens and returns a video for writing.
+
+    Use the VideoWriter's `write` method to save images.
+    Remember to 'release' when finished.
+
+    Args:
+        filename (string): Filename for saved video
+        frame_size (tuple): Width, height tuple of output video
+        fps (int): Frames per second
+    Returns:
+        VideoWriter: Instance of VideoWriter ready for writing
+    """
+    fourcc = cv2.VideoWriter_fourcc(*'MP4V')
+    return cv2.VideoWriter(filename, fourcc, fps, frame_size)
 
 
+def save_image(filename, image):
+    """Convenient wrapper for writing images to the output directory."""
+    cv2.imwrite(os.path.join(OUT_DIR, filename), image)
 
+
+def mark_location(image, pt):
+    """Draws a dot on the marker center and writes the location as text nearby.
+
+    Args:
+        image (numpy.array): Image to draw on
+        pt (tuple): (x, y) coordinate of marker center
+    """
+    color = (0, 50, 255)
+    cv2.circle(image, pt, 3, color, -1)
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    cv2.putText(image, "(x:{}, y:{})".format(*pt), (pt[0] + 15, pt[1]), font, 0.5, color, 1)
+
+
+def part_1():
+    print("\nPart 1:")
+
+    input_images = ['sim_clear_scene.jpg', 'sim_noisy_scene_1.jpg',
+                    'sim_noisy_scene_2.jpg']
+    output_images = ['ps3-1-a-1.png', 'ps3-1-a-2.png', 'ps3-1-a-3.png']
+
+    # Optional template image
+    template = cv2.imread(os.path.join(IMG_DIR, "template.jpg"))
+
+    for img_in, img_out in zip(input_images, output_images):
+
+        print("Input image: {}".format(img_in))
+
+        # Open image and identify the four marker positions
+        scene = cv2.imread(os.path.join(IMG_DIR, img_in))
+
+        marker_positions = ps3.find_markers(scene, template)
+
+        for marker in marker_positions:
+            mark_location(scene, marker)
+
+        save_image(img_out, scene)
+
+
+def part_2():
+    print("\nPart 2:")
+
+    input_images = ['ps3-2-a_base.jpg', 'ps3-2-b_base.jpg',
+                    'ps3-2-c_base.jpg', 'ps3-2-d_base.jpg', 'ps3-2-e_base.jpg']
+    output_images = ['ps3-2-a-1.png', 'ps3-2-a-2.png', 'ps3-2-a-3.png',
+                     'ps3-2-a-4.png', 'ps3-2-a-5.png']
+
+    # Optional template image
+    template = cv2.imread(os.path.join(IMG_DIR, "template.jpg"))
+
+    for img_in, img_out in zip(input_images, output_images):
+        print("Input image: {}".format(img_in))
+
+        # Open image and identify the four marker positions
+        scene = cv2.imread(os.path.join(IMG_DIR, img_in))
+
+        markers = ps3.find_markers(scene, template)
+        image_with_box = ps3.draw_box(scene, markers, 3)
+
+        save_image(img_out, image_with_box)
+
+
+def part_3():
+    print("\nPart 3:")
+
+    input_images = ['ps3-3-a_base.jpg', 'ps3-3-b_base.jpg', 'ps3-3-c_base.jpg']
+    output_images = ['ps3-3-a-1.png', 'ps3-3-a-2.png', 'ps3-3-a-3.png']
+
+    # Advertisement image
+    advert = cv2.imread(os.path.join(IMG_DIR, "img-3-a-1.png"))
+    src_points = ps3.get_corners_list(advert)
+
+    # Optional template image
+    template = cv2.imread(os.path.join(IMG_DIR, "template.jpg"))
+
+    for img_in, img_out in zip(input_images, output_images):
+        print("Input image: {}".format(img_in))
+
+        # Open image and identify the four marker positions
+        scene = cv2.imread(os.path.join(IMG_DIR, img_in))
+
+        markers = ps3.find_markers(scene, template)
+
+        homography = ps3.find_four_point_transform(src_points, markers)
+
+        projected_img = ps3.project_imageA_onto_imageB(advert, scene,
+                                                       homography)
+
+        save_image(img_out, projected_img)
+
+
+def part_4_a_1():
+    print("\nPart 4a:")
+
+    video_file = "ps3-4-a.mp4"
+    frame_ids = [355, 555, 725]
+    fps = 40
+
+    helper_for_part_4_and_5(video_file, fps, frame_ids, "ps3-4-a", 1, False)
+def part_4_a_2():
+
+    video_file = "ps3-4-b.mp4"
+    frame_ids = [97, 407, 435]
+    fps = 40
+
+    helper_for_part_4_and_5(video_file, fps, frame_ids, "ps3-4-a", 4, False)
+
+
+def part_4_b_1():
+    print("\nPart 4b:")
+
+    video_file = "ps3-4-c.mp4"
+    frame_ids = [47, 470, 691]
+    fps = 40
+
+    helper_for_part_4_and_5(video_file, fps, frame_ids, "ps3-4-b", 1, False)
+
+def part_4_b_2():
+
+    video_file = "ps3-4-d.mp4"
+    frame_ids = [207, 367, 737]
+    fps = 40
+
+    helper_for_part_4_and_5(video_file, fps, frame_ids, "ps3-4-b", 4, False)
+
+
+def part_5_a_1():
+    print("\nPart 5a:")
+
+    video_file = "ps3-4-a.mp4"
+    frame_ids = [355, 555, 725]
+    fps = 40
+
+    helper_for_part_4_and_5(video_file, fps, frame_ids, "ps3-5-a", 1, True)
+
+def part_5_a_2():
+
+    video_file = "ps3-4-b.mp4"
+    frame_ids = [97, 407, 435]
+    fps = 40
+
+    helper_for_part_4_and_5(video_file, fps, frame_ids, "ps3-5-a", 4, True)
+
+
+def part_5_b_1():
+    print("\nPart 5b:")
+
+    video_file = "ps3-4-c.mp4"
+    frame_ids = [47, 470, 691]
+    fps = 40
+
+    helper_for_part_4_and_5(video_file, fps, frame_ids, "ps3-5-b", 1, True)
+
+def part_5_b_2():
+
+    video_file = "ps3-4-d.mp4"
+    frame_ids = [207, 367, 737]
+    fps = 40
+
+    helper_for_part_4_and_5(video_file, fps, frame_ids, "ps3-5-b", 4, True)
+
+
+def part_6():
+    print("\nPart 6:")
+
+    video_file = "ps3-4-a.mp4"
+    my_video = "my-ad.mp4"  # Place your video in the input_video directory
+    frame_ids = [355, 555, 725]
+    fps = 40
+
+    # Todo: Complete this part on your own.
+
+
+if __name__ == '__main__':
+    print("--- Problem Set 3 ---")
+    # Comment out the sections you want to skip
+    proc = []
+    # part_1()
+    # part_2()
+    # part_3()
+
+    for i in [part_4_a_1,part_4_a_2,part_4_b_1,part_4_b_2,part_5_a_1,part_5_a_2,part_5_b_1,part_5_b_2]:
+        p = Process(target=i)
+        p.start()
+        proc.append(p)
+    for p in proc:
+        p.join()
+    # part_4_a()
+    # part_4_b()
+    # part_5_a()
+    # part_5_b()
+    # part_6()

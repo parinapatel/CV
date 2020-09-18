@@ -261,11 +261,70 @@ def part_6():
     print("\nPart 6:")
 
     video_file = "ps3-4-a.mp4"
-    my_video = "my-ad.mp4"  # Place your video in the input_video directory
+    my_video = "Sunset On A Snowy Day.mp4"  # Place your video in the input_video directory
     frame_ids = [355, 555, 725]
     fps = 40
 
+    output_prefix = "ps3-6"
+    video_name = "ps3-6-video.mp4"
+
     # Todo: Complete this part on your own.
+    video = os.path.join(VID_DIR, video_file)
+    frames = int(cv2.VideoCapture(video).get(cv2.CAP_PROP_FRAME_COUNT))
+    ad = os.path.join(VID_DIR, my_video)
+
+    image_gen = ps3.video_frame_generator(video)
+    ad_gen = ps3.video_frame_generator(ad)
+    print ("Add Frame {}".format(int(cv2.VideoCapture(ad).get(cv2.CAP_PROP_FRAME_COUNT))))
+
+    image = image_gen.__next__()
+    h, w, d = image.shape
+
+    out_path = "ar_{}-{}".format(output_prefix[4:], video_name)
+    video_out = mp4_video_writer(out_path, (w, h), fps)
+
+    # Optional template image
+    template = cv2.imread(os.path.join(IMG_DIR, "template.jpg"))
+
+    advert = ad_gen.__next__()
+    src_points = ps3.get_corners_list(advert)
+
+    counter_init = 1
+    output_counter = counter_init
+
+    frame_num = 1
+
+    while image is not None:
+
+        print("Processing frame {}/{}".format(frame_num, frames))
+
+        advert_next = ad_gen.__next__()
+        if advert_next is not None:
+            advert = advert_next
+        else:
+            # Loop the video back
+            ad_gen = ps3.video_frame_generator(ad)
+            advert = ad_gen.__next__()
+
+        markers = ps3.find_markers(image, template)
+
+        homography = ps3.find_four_point_transform(src_points, markers)
+        image = ps3.project_imageA_onto_imageB(advert, image, homography)
+
+        frame_id = frame_ids[(output_counter - 1) % 3]
+
+        if frame_num == frame_id:
+            out_str = output_prefix + "-{}.png".format(output_counter)
+            save_image(out_str, image)
+            output_counter += 1
+
+        video_out.write(image)
+
+        image = image_gen.__next__()
+
+        frame_num += 1
+
+    video_out.release()
 
 
 if __name__ == '__main__':

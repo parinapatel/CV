@@ -558,7 +558,7 @@ def find_four_point_transform(src_points, dst_points):
     A = np.asarray(A)
     b = np.asarray(b)
     # transform_matrix = np.linalg.solve(A,b)
-    H = np.linalg.lstsq(A,b)[0]
+    H = np.linalg.lstsq(A,b,rcond=None)[0]
     h9 = np.array([1])
     H = np.append(H,h9)
     H = H.reshape(3,3)
