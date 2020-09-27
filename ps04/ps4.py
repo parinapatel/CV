@@ -39,7 +39,9 @@ def gradient_x(image):
                      from cv2.Sobel.
     """
 
-    return cv2.Sobel(image, -1, 1, 0, 0.125, 3, cv2.BORDER_DEFAULT)
+    # return cv2.Sobel(image, -1, 1, 0, 0.125, 3, cv2.BORDER_DEFAULT)
+    sobelx = cv2.Sobel(image, ddepth=-1, dx=1, dy=0, scale=1.0 / 8, ksize=3)
+    return sobelx
 
 
 def gradient_y(image):
@@ -57,7 +59,9 @@ def gradient_y(image):
                      Output from cv2.Sobel.
     """
 
-    return cv2.Sobel(image, -1, 0, 1, 0.125, 3, cv2.BORDER_DEFAULT)
+    sobelx = cv2.Sobel(image, ddepth=-1, dx=0, dy=1, scale=1.0 / 8, ksize=3)
+    return sobelx
+    # x = cv2.Sobel(image, -1, 0, 1, 0.125, 3, cv2.BORDER_DEFAULT)
 
 
 def optic_flow_lk(img_a, img_b, k_size, k_type, sigma=1):
@@ -103,28 +107,32 @@ def optic_flow_lk(img_a, img_b, k_size, k_type, sigma=1):
 
     if k_type == "uniform":
         k = np.ones((k_size, k_size), np.float32)/(k_size**2)
+        temp_a = np.copy(img_a)
+        temp_b = np.copy(img_b)
     elif k_type == "gaussian":
         k = cv2.getGaussianKernel((k_size**2), sigma, ktype = cv2.CV_32F).reshape((k_size, k_size))
+        temp_a = cv2.GaussianBlur(img_a, ksize=(k_size, k_size), sigmaX=sigma, sigmaY=sigma)
+        temp_b = cv2.GaussianBlur(img_b, ksize=(k_size, k_size), sigmaX=sigma, sigmaY=sigma)
     else:
         print("kernel type is not defined properly. Please define kernel type")
         return
 
-    Ix = gradient_x(img_a)
-    Iy = gradient_y(img_b)
-    It = img_b - img_a
+    It = cv2.subtract(temp_a, temp_b).astype(np.float64)
+    Ix = gradient_x(temp_a)
+    Iy = gradient_y(temp_a)
 
-    a = IxIx = cv2.filter2D(Ix*Ix, -1, k)
-    b = c = IxIy = cv2.filter2D(Ix*Iy, -1, k)
-    d = IyIy = cv2.filter2D(Iy*Iy, -1, k)
-    e = IxIt = cv2.filter2D(Ix*It, -1, k)
-    f = IyIt = cv2.filter2D(Iy*It, -1, k)
+    IxIx = cv2.filter2D(Ix*Ix, -1, k)
+    IxIy = cv2.filter2D(Ix*Iy, -1, k)
+    IyIy = cv2.filter2D(Iy*Iy, -1, k)
+    IxIt = cv2.filter2D(Ix*It, -1, k)
+    IyIt = cv2.filter2D(Iy*It, -1, k)
 
     noise = 0.001*np.random.rand(1)[0]
     detA = IxIx * IyIy - IxIy * IxIy
     detA[detA == 0] = noise
 
-    U = (IyIt*IxIy - IyIy*IxIt)/detA
-    V = (IxIt*IxIy - IxIx*IyIt)/detA
+    U = -(IyIt*IxIy - IyIy*IxIt)/detA
+    V = -(IxIt*IxIy - IxIx*IyIt)/detA
 
     return U, V
 
