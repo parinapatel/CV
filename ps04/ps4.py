@@ -136,6 +136,7 @@ def optic_flow_lk(img_a, img_b, k_size, k_type, sigma=1):
 
     return U, V
 
+
 def reduce_image(image):
     """Reduces an image to half its shape.
 
@@ -160,8 +161,16 @@ def reduce_image(image):
         numpy.array: output image with half the shape, same type as the
                      input image.
     """
+    param = 0.4    # for 0.4 the kernel turns out to be gaussian like according to the paper
+    kernel_1d = np.array([0.25-param/2, 0.25, param, 0.25, 0.25-param/2])
+    kernel = np.outer(kernel_1d, kernel_1d)
 
-    raise NotImplementedError
+    filtered = cv2.filter2D(image, -1, kernel)
+
+    reduced = filtered[::2,::2]
+
+    return reduced
+
 
 
 def gaussian_pyramid(image, levels):
@@ -185,7 +194,17 @@ def gaussian_pyramid(image, levels):
         list: Gaussian pyramid, list of numpy.arrays.
     """
 
-    raise NotImplementedError
+    pyramid = []
+    pyramid.append(image)
+
+    reduction = image
+    for level in range(1, levels):
+        reduced_img = reduce_image(reduction)
+        pyramid.append(reduced_img)
+        reduction = reduced_img
+
+    return pyramid
+
 
 
 def create_combined_img(img_list):
@@ -207,7 +226,17 @@ def create_combined_img(img_list):
                      from left to right.
     """
 
-    raise NotImplementedError
+    output_image = normalize_and_scale(img_list[0])
+
+    rows, cols = output_image.shape
+    for i in range(1,len(img_list)):
+        out = normalize_and_scale(img_list[i])
+        rs, cs = out.shape
+        padding = np.zeros((rows-rs, cs))
+        out = np.append(out, padding).reshape(rows, cs)
+        output_image = np.append(output_image, out, axis=1)
+
+    return output_image
 
 
 def expand_image(image):
@@ -230,8 +259,18 @@ def expand_image(image):
         numpy.array: same type as 'image' with the doubled height and
                      width.
     """
+    r, c = image.shape
+    expanded = np.zeros((r*2, c*2))
+    expanded[::2,::2] = image
 
-    raise NotImplementedError
+    kernel_1d = np.array([0.0625, 0.25, 0.375, 0.25, 0.0625])
+    kernel = np.outer(kernel_1d, kernel_1d)
+
+    out = 4.0*cv2.filter2D(expanded, -1, kernel)
+
+    return out
+
+
 
 
 def laplacian_pyramid(g_pyr):
@@ -245,8 +284,16 @@ def laplacian_pyramid(g_pyr):
     Returns:
         list: Laplacian pyramid, with l_pyr[-1] = g_pyr[-1].
     """
+    l_pyr = [0]*len(g_pyr)
+    l_pyr[-1] = g_pyr[-1]
 
-    raise NotImplementedError
+    for i in range(len(g_pyr)-2,-1,-1):
+        expanded = expand_image(g_pyr[i+1])
+        r, c = g_pyr[i].shape
+        expanded = expanded[:r,:c]
+        l_pyr[i] = g_pyr[i] - expanded
+
+    return l_pyr
 
 
 def warp(image, U, V, interpolation, border_mode):
