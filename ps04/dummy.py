@@ -108,99 +108,74 @@ def optic_flow_lk(img_a, img_b, k_size, k_type, sigma=1):
             V (numpy.array): raw displacement (in pixels) along
                              Y-axis, same size and type as U.
     """
-
-
-    Ix = gradient_x(img_a)
-    Iy = gradient_y(img_a)
-    It = img_b - img_a
-
-
-
-    if k_type == 'uniform':
-        kernel = np.ones((k_size,k_size),np.float32)/(k_size*k_size)
-        a = cv2.filter2D(Ix*Ix,-1,kernel)
-        b = cv2.filter2D(Ix*Iy,-1,kernel)
-        c = cv2.filter2D(Ix*Iy,-1,kernel)
-        d = cv2.filter2D(Iy*Iy,-1,kernel)
-        e = cv2.filter2D(Ix*It,-1,kernel)
-        f = cv2.filter2D(Iy*It,-1,kernel)
-
+    filt = (k_size, k_size)
     if k_type == 'gaussian':
-        a = cv2.GaussianBlur(Ix*Ix,(k_size,k_size),sigmaX=sigma, sigmaY=sigma)
-        b = cv2.GaussianBlur(Ix*Iy,(k_size,k_size),sigmaX=sigma, sigmaY=sigma)
-        c = cv2.GaussianBlur(Ix*Iy,(k_size,k_size),sigmaX=sigma, sigmaY=sigma)
-        d = cv2.GaussianBlur(Iy*Iy,(k_size,k_size),sigmaX=sigma, sigmaY=sigma)
-        e = cv2.GaussianBlur(Ix*It,(k_size,k_size),sigmaX=sigma, sigmaY=sigma)
-        f = cv2.GaussianBlur(Iy*It,(k_size,k_size),sigmaX=sigma, sigmaY=sigma)
+        temp_a = cv2.GaussianBlur(img_a, ksize=filt, sigmaX=sigma, sigmaY=sigma)
+        temp_b = cv2.GaussianBlur(img_b, ksize=filt, sigmaX=sigma, sigmaY=sigma)
+    else:
+        temp_a = np.copy(img_a)
+        temp_b = np.copy(img_b)
 
-    noise = np.asscalar(0.001*np.random.rand(1, 1))
-    denominator = a*d - b*c
-    denominator[denominator == 0] = noise
-    # denominant[np.where(denominant == 0)] = noise
-    determinant = 1.0/denominator
+    It = cv2.subtract(temp_a, temp_b).astype(np.float64)
+    Ix = gradient_x(temp_a)
+    Iy = gradient_y(temp_a)
 
-    # x = d*e-b*f
-    # y = -c*e+a*f
-    # X = np.array([x,y])
-    # solved_array = determinant * X
-    # u = solved_array[0]
-    # v = solved_array[1]
-    # the elements of inverse Matrix of A
+    Sxx = cv2.boxFilter(Ix ** 2, -1, ksize=filt, normalize=False)
+    Syy = cv2.boxFilter(Iy ** 2, -1, ksize=filt, normalize=False)
+    Sxy = cv2.boxFilter(Ix * Iy, -1, ksize=filt, normalize=False)
+    Sxt = cv2.boxFilter(Ix * It, -1, ksize=filt, normalize=False)
+    Syt = cv2.boxFilter(Iy * It, -1, ksize=filt, normalize=False)
 
-    e1 = determinant*d
-    e2 = determinant*(-b)
-    e3 = determinant*(-c)
-    e4 = determinant*a
+    M_det = np.clip(Sxx * Syy - Sxy ** 2, 0.000001, np.inf)
+    temp_u = -1 * (Syy * (-Sxt) + (-Sxy) * (-Syt))
+    temp_v = -1 * ((-Sxy) * (-Sxt) + Sxx * (-Syt))
+    U = np.where(M_det != 0, temp_u / M_det, 0).astype(np.float64)
+    V = np.where(M_det != 0, temp_v / M_det, 0).astype(np.float64)
 
-    # multiple the inverse Matrix of A with [e,
-    # u = e4 * -e + e3 * -f
-    # v = e2 * -f + e1 * -e
+    return (U, V)
 
-    u = e1 * -e + e3 * -f
-    v = e2 * -e + e4 * -f
-
-
-
-    # u = ((a * determinant * -e)) + ((-c * determinant)* -f)
-    # v = ((determinant*(-b) * -f)) + ((determinant*d)* -e)
+    # Ix = gradient_x(img_a)
+    # Iy = gradient_y(img_a)
+    # It = img_b - img_a
     #
-    result = (u, v)
-    # x = d*e-b*f
-    # y = -c*e+a*f
     #
-    # u = determinant * x
-    # v = determinant * y
-
-    # A=np.array([[a,b],[c,d]])
     #
-    # A_abs=np.linalg.det(A)
-    # A_inv = np.linalg.inv(A)
-    # A = np.matrix([[a, b],[c, d]])
-    # A = []
-    # A = A.append([a, b])
-    # A = A.append([c, d])
-
-
-    # B = np.matrix([-e,-f])
-
-    # noise = np.asscalar(0.00001*np.random.rand(1, 1))
-    # A[np.where(A == 0)] = noise
-
-    # A_inv = np.linalg.inv(A)
-
-    # result = A_inv * B
-
-    return result
-
-
-
-
-
-
-
-
-
-    # raise NotImplementedError
+    # if k_type == 'uniform':
+    #     kernel = np.ones((k_size,k_size),np.float32)/(k_size*k_size)
+    #     a = cv2.filter2D(Ix*Ix,-1,kernel)
+    #     b = cv2.filter2D(Ix*Iy,-1,kernel)
+    #     c = cv2.filter2D(Ix*Iy,-1,kernel)
+    #     d = cv2.filter2D(Iy*Iy,-1,kernel)
+    #     e = cv2.filter2D(Ix*It,-1,kernel)
+    #     f = cv2.filter2D(Iy*It,-1,kernel)
+    #
+    # if k_type == 'gaussian':
+    #     a = cv2.GaussianBlur(Ix*Ix,(k_size,k_size),sigmaX=sigma, sigmaY=sigma)
+    #     b = cv2.GaussianBlur(Ix*Iy,(k_size,k_size),sigmaX=sigma, sigmaY=sigma)
+    #     c = cv2.GaussianBlur(Ix*Iy,(k_size,k_size),sigmaX=sigma, sigmaY=sigma)
+    #     d = cv2.GaussianBlur(Iy*Iy,(k_size,k_size),sigmaX=sigma, sigmaY=sigma)
+    #     e = cv2.GaussianBlur(Ix*It,(k_size,k_size),sigmaX=sigma, sigmaY=sigma)
+    #     f = cv2.GaussianBlur(Iy*It,(k_size,k_size),sigmaX=sigma, sigmaY=sigma)
+    #
+    # noise = np.asscalar(0.001*np.random.rand(1, 1))
+    # denominator = a*d - b*c
+    # denominator[denominator == 0] = noise
+    # # denominant[np.where(denominant == 0)] = noise
+    # determinant = 1.0/denominator
+    #
+    #
+    # e1 = determinant*d
+    # e2 = determinant*(-b)
+    # e3 = determinant*(-c)
+    # e4 = determinant*a
+    #
+    #
+    # u = e1 * -e + e3 * -f
+    # v = e2 * -e + e4 * -f
+    # #
+    # result = (u, v)
+    #
+    # return result
 
 
 def reduce_image(image):
