@@ -69,8 +69,15 @@ def scale_u_and_v(u, v, level, pyr):
     """
 
     # TODO: Your code here
-    raise NotImplementedError
+    for i in range(level-1,-1,-1):
+        u = ps4.expand_image(u)
+        v = ps4.expand_image(v)
 
+        r, c = pyr[i].shape
+        u = u[:r,:c]
+        v = v[:r, :c]
+        # print("U shape: {} V shape: {} current level: {} ".format(u.shape, v.shape, pyr[i].shape))
+    return u,v
 
 def part_1a():
 
@@ -173,13 +180,13 @@ def part_3a_1():
     yos_img_02 = cv2.imread(
         os.path.join(input_dir, 'DataSeq1', 'yos_img_02.jpg'), 0) / 255.
 
-    levels = 1  # Define the number of pyramid levels
+    levels = 5  # Define the number of pyramid levels
     yos_img_01_g_pyr = ps4.gaussian_pyramid(yos_img_01, levels)
     yos_img_02_g_pyr = ps4.gaussian_pyramid(yos_img_02, levels)
 
-    level_id = 0  # TODO: Select the level number (or id) you wish to use
-    k_size = 0 # TODO: Select a kernel size
-    k_type = ""  # TODO: Select a kernel type
+    level_id = 4  # TODO: Select the level number (or id) you wish to use
+    k_size = 50 # TODO: Select a kernel size
+    k_type = "uniform"  # TODO: Select a kernel type
     sigma = 0  # TODO: Select a sigma value if you are using a gaussian kernel
     u, v = ps4.optic_flow_lk(yos_img_01_g_pyr[level_id],
                              yos_img_02_g_pyr[level_id],
@@ -202,13 +209,13 @@ def part_3a_2():
     yos_img_03 = cv2.imread(
         os.path.join(input_dir, 'DataSeq1', 'yos_img_03.jpg'), 0) / 255.
 
-    levels = 1  # Define the number of pyramid levels
+    levels = 4  # Define the number of pyramid levels
     yos_img_02_g_pyr = ps4.gaussian_pyramid(yos_img_02, levels)
     yos_img_03_g_pyr = ps4.gaussian_pyramid(yos_img_03, levels)
 
-    level_id = 1 # TODO: Select the level number (or id) you wish to use
-    k_size = 0 # TODO: Select a kernel size
-    k_type = ""  # TODO: Select a kernel type
+    level_id = 3 # TODO: Select the level number (or id) you wish to use
+    k_size = 40 # TODO: Select a kernel size
+    k_type = "uniform"  # TODO: Select a kernel type
     sigma = 0 # TODO: Select a sigma value if you are using a gaussian kernel
     u, v = ps4.optic_flow_lk(yos_img_02_g_pyr[level_id],
                              yos_img_03_g_pyr[level_id],
@@ -327,9 +334,9 @@ def part_6():
 if __name__ == '__main__':
     # part_1a()
     # part_1b()
-    part_2()
-    # part_3a_1()
-    # part_3a_2()
+    # part_2()
+    part_3a_1()
+    part_3a_2()
     # part_4a()
     # part_4b()
     # part_5a()
