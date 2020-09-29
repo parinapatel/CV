@@ -142,16 +142,16 @@ def part_1b():
     shift_r40 = cv2.imread(os.path.join(input_dir, 'TestSeq',
                                         'ShiftR40.png'), 0) / 255.
 
-    dict = [{"gblur_k":(13,13), "gblur_sigma": 3, "k_size":105, "k_type": "uniform", "sigma":0, "img_1": shift_0, "img_2": shift_r10},
-            {"gblur_k":(15,15), "gblur_sigma": 10, "k_size":91, "k_type": "uniform", "sigma":0, "img_1": shift_0, "img_2": shift_r20},
-            {"gblur_k":(19,19), "gblur_sigma": 14, "k_size":107, "k_type": "uniform", "sigma":0, "img_1": shift_0, "img_2": shift_r40}]
+    dict = [{"gblur_k":(45,45), "gblur_sigma": 11, "k_size":95, "k_type": "uniform", "sigma":0, "img_1": shift_0, "img_2": shift_r10, "scale":1, "stride":10},
+            {"gblur_k":(99, 99), "gblur_sigma": 16, "k_size":99, "k_type": "uniform", "sigma":0, "img_1": shift_0, "img_2": shift_r20, "scale":0.5, "stride":10},
+            {"gblur_k":(99,99), "gblur_sigma": 21, "k_size":107, "k_type": "uniform", "sigma":0, "img_1": shift_0, "img_2": shift_r40, "scale":0.25, "stride":12}]
 
     for i in range(len(dict)):
         d = dict[i]
         img_a = cv2.GaussianBlur(d["img_1"], d["gblur_k"], d["gblur_sigma"])
         img_b = cv2.GaussianBlur(d["img_2"], d["gblur_k"], d["gblur_sigma"])
         u, v = ps4.optic_flow_lk(img_a, img_b, d["k_size"], d["k_type"], d["sigma"])
-        u_v = quiver(u, v, scale=2, stride=10)
+        u_v = quiver(u, v, scale=d["scale"], stride=d["stride"])
         cv2.imwrite(os.path.join(output_dir, "ps4-1-b-"+str(i+1)+".png"), u_v)
 
 def part_2():
@@ -332,9 +332,9 @@ def part_6():
 
 
 if __name__ == '__main__':
-    # part_1a()
-    # part_1b()
-    # part_2()
+    part_1a()
+    part_1b()
+    part_2()
     part_3a_1()
     part_3a_2()
     # part_4a()

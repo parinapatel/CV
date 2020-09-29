@@ -107,19 +107,15 @@ def optic_flow_lk(img_a, img_b, k_size, k_type, sigma=1):
 
     if k_type == "uniform":
         k = np.ones((k_size, k_size), np.float32)/(k_size**2)
-        temp_a = np.copy(img_a)
-        temp_b = np.copy(img_b)
     elif k_type == "gaussian":
         k = cv2.getGaussianKernel((k_size**2), sigma, ktype = cv2.CV_32F).reshape((k_size, k_size))
-        temp_a = cv2.GaussianBlur(img_a, ksize=(k_size, k_size), sigmaX=sigma, sigmaY=sigma)
-        temp_b = cv2.GaussianBlur(img_b, ksize=(k_size, k_size), sigmaX=sigma, sigmaY=sigma)
     else:
         print("kernel type is not defined properly. Please define kernel type")
         return
 
-    It = cv2.subtract(temp_a, temp_b).astype(np.float64)
-    Ix = gradient_x(temp_a)
-    Iy = gradient_y(temp_a)
+    It = cv2.subtract(img_a, img_b).astype(np.float64)
+    Ix = gradient_x(img_a)
+    Iy = gradient_y(img_a)
 
     IxIx = cv2.filter2D(Ix*Ix, -1, k)
     IxIy = cv2.filter2D(Ix*Iy, -1, k)
