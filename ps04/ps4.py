@@ -107,21 +107,33 @@ def optic_flow_lk(img_a, img_b, k_size, k_type, sigma=1):
 
     if k_type == "uniform":
         k = np.ones((k_size, k_size), np.float32)/(k_size**2)
+        It = cv2.subtract(img_a, img_b).astype(np.float64)
+        Ix = gradient_x(img_a)
+        Iy = gradient_y(img_a)
+
+        IxIx = cv2.filter2D(Ix * Ix, -1, k)
+        IxIy = cv2.filter2D(Ix * Iy, -1, k)
+        IyIy = cv2.filter2D(Iy * Iy, -1, k)
+        IxIt = cv2.filter2D(Ix * It, -1, k)
+        IyIt = cv2.filter2D(Iy * It, -1, k)
+
     elif k_type == "gaussian":
-        k = cv2.getGaussianKernel((k_size**2), sigma, ktype = cv2.CV_32F).reshape((k_size, k_size))
+        temp_a = cv2.GaussianBlur(img_a, (k_size, k_size), sigma)
+        temp_b = cv2.GaussianBlur(img_b, (k_size, k_size), sigma)
+        It = cv2.subtract(temp_a, temp_b).astype(np.float64)
+        Ix = gradient_x(temp_a)
+        Iy = gradient_y(temp_a)
+
+        IxIx = cv2.boxFilter(Ix * Ix, -1,  (k_size, k_size), normalize=False)
+        IxIy = cv2.boxFilter(Ix * Iy, -1,  (k_size, k_size), normalize=False)
+        IyIy = cv2.boxFilter(Iy * Iy, -1,  (k_size, k_size), normalize=False)
+        IxIt = cv2.boxFilter(Ix * It, -1,  (k_size, k_size), normalize=False)
+        IyIt = cv2.boxFilter(Iy * It, -1,  (k_size, k_size), normalize=False)
+
     else:
         print("kernel type is not defined properly. Please define kernel type")
         return
 
-    It = cv2.subtract(img_a, img_b).astype(np.float64)
-    Ix = gradient_x(img_a)
-    Iy = gradient_y(img_a)
-
-    IxIx = cv2.filter2D(Ix*Ix, -1, k)
-    IxIy = cv2.filter2D(Ix*Iy, -1, k)
-    IyIy = cv2.filter2D(Iy*Iy, -1, k)
-    IxIt = cv2.filter2D(Ix*It, -1, k)
-    IyIt = cv2.filter2D(Iy*It, -1, k)
 
     noise = 0.001*np.random.rand(1)[0]
     detA = IxIx * IyIy - IxIy * IxIy
@@ -356,5 +368,30 @@ def hierarchical_lk(img_a, img_b, levels, k_size, k_type, sigma, interpolation,
             V (numpy.array): raw displacement (in pixels) along Y-axis,
                              same size and type as U.
     """
+    pyr_a = gaussian_pyramid(img_a, levels)
+    pyr_b = gaussian_pyramid(img_b, levels)
 
-    raise NotImplementedError
+    r, c = img_a.shape
+    U = np.zeros((r // (2 ** (levels - 1)), c // (2 ** (levels - 1))), dtype=np.float64)
+    V = np.zeros((r // (2 ** (levels - 1)), c // (2 ** (levels - 1))), dtype=np.float64)
+
+    for i in range(levels-1, -1, -1):
+        i_a = pyr_a[i]
+        i_b = pyr_b[i]
+        w_b = pyr_b[i]
+
+        # print("{} {} {} {} {} ".format(i, levels-1, U.shape, V.shape, w_b.shape))
+
+        if i!=(levels-1):
+            U = 2*expand_image(U)
+            V = 2*expand_image(V)
+            # print("{} {} {} {} {} ".format(i, levels - 1, U.shape, V.shape, w_b.shape))
+            w_b = warp(i_b, U, V, interpolation, border_mode)
+
+        # print("{} {} {} ".format(U.shape, V.shape, w_b.shape))
+
+        u_l, v_l = optic_flow_lk(i_a, w_b, k_size, k_type, sigma)
+        U += u_l
+        V += v_l
+
+    return U, V
