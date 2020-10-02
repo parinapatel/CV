@@ -297,6 +297,26 @@ def part_4b():
     cv2.imwrite(os.path.join(output_dir, "ps4-4-b-2.png"),
                 ps4.normalize_and_scale(diff_img))
 
+def interpolate(img_a, img_b, t_seq, levels, k_size, k_type, sigma, interpolation, border_mode):
+    U, V = ps4.hierarchical_lk(img_a, img_b, levels, k_size, k_type, sigma, interpolation, border_mode)
+    seq = []
+    seq.append(img_a)
+    print(img_a.shape)
+
+
+    for i in range(len(t_seq)):
+        img_warp = ps4.warp(img_a, -(t_seq[i])*U, -(t_seq[i])*V, interpolation, border_mode)
+        scaled = ps4.normalize_and_scale(img_warp)
+        seq.append(scaled)
+
+    c = int((len(t_seq)+1)/2)
+    seq[0] = ps4.normalize_and_scale(img_a)
+
+    r1 = np.hstack(seq[:c])
+    r2 = np.hstack(seq[c:])
+    combined = np.vstack([r1, r2])
+
+    return combined, seq
 
 def part_5a():
     """Frame interpolation
@@ -305,8 +325,21 @@ def part_5a():
 
     Place all your work in this file and this section.
     """
+    shift_0 = cv2.imread(os.path.join(input_dir, 'TestSeq',
+                                      'Shift0.png'), 0) / 255.
+    shift_r10 = cv2.imread(os.path.join(input_dir, 'TestSeq',
+                                        'ShiftR10.png'), 0) / 255.
 
-    raise NotImplementedError
+    t_seq = [0.2,0.4,0.6,0.8,1]
+    combined_image, seq = interpolate(shift_0, shift_r10, t_seq, 5, 31, "uniform", 0, cv2.INTER_CUBIC, cv2.BORDER_REFLECT101)
+
+    # i = 0
+    # for image in seq:
+    #     cv2.imwrite(os.path.join(output_dir+"/5a/", str(i)+".png"), image)
+    #     i +=1
+
+    cv2.imwrite(os.path.join(output_dir, "ps4-5-a-1.png"), combined_image)
+
 
 
 def part_5b():
@@ -317,8 +350,34 @@ def part_5b():
     Place all your work in this file and this section.
     """
 
-    raise NotImplementedError
+    mc01 = cv2.imread(os.path.join(input_dir, 'MiniCooper',
+                                      'mc01.png'), 0) / 255.
+    mc02 = cv2.imread(os.path.join(input_dir, 'MiniCooper',
+                                        'mc02.png'), 0) / 255.
 
+    t_seq = [0.2,0.4,0.6,0.8,1]
+    combined_image, seq1 = interpolate(mc01, mc02, t_seq, 5, 31, "uniform", 0, cv2.INTER_CUBIC, cv2.BORDER_REFLECT101)
+
+    # i = 0
+    # for image in seq1:
+    #     cv2.imwrite(os.path.join(output_dir + "/5b1/", str(i) + ".png"), image)
+    #     i += 1
+
+    cv2.imwrite(os.path.join(output_dir, "ps4-5-b-1.png"), combined_image)
+
+    mc02 = cv2.imread(os.path.join(input_dir, 'MiniCooper',
+                                      'mc02.png'), 0) / 255.
+    mc03 = cv2.imread(os.path.join(input_dir, 'MiniCooper',
+                                        'mc03.png'), 0) / 255.
+
+    t_seq = [0.2,0.4,0.6,0.8,1]
+    combined_image,seq2 = interpolate(mc02, mc03, t_seq, 5, 31, "uniform", 0, cv2.INTER_CUBIC, cv2.BORDER_REFLECT101)
+    # i = 0
+    # for image in seq2:
+    #     cv2.imwrite(os.path.join(output_dir + "/5b2/", str(i) + ".png"), image)
+    #     i += 1
+
+    cv2.imwrite(os.path.join(output_dir, "ps4-5-b-2.png"), combined_image)
 
 def part_6():
     """Challenge Problem
@@ -337,8 +396,8 @@ if __name__ == '__main__':
     # part_2()
     # part_3a_1()
     # part_3a_2()
-    part_4a()
-    part_4b()
-    # part_5a()
-    # part_5b()
+    # part_4a()
+    # part_4b()
+    part_5a()
+    part_5b()
     # part_6()
