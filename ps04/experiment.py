@@ -27,6 +27,18 @@ def quiver(u, v, scale, stride, color=(0, 255, 0)):
     return img_out
 
 
+def quiver_on_img(img, u, v, scale, stride, color=(0, 255, 0)):
+    img_out = img[:v.shape[0], :u.shape[1],:]
+
+    for y in range(0, v.shape[0], stride):
+        for x in range(0, u.shape[1], stride):
+            cv2.line(img_out, (x, y), (x + int(u[y, x] * scale),
+                                       y + int(v[y, x] * scale)), color, 1)
+            cv2.circle(img_out, (x + int(u[y, x] * scale),
+                                 y + int(v[y, x] * scale)), 1, color, 1)
+    return img_out
+
+
 # Functions you need to complete:
 
 def scale_u_and_v(u, v, level, pyr):
@@ -297,12 +309,12 @@ def part_4b():
     cv2.imwrite(os.path.join(output_dir, "ps4-4-b-2.png"),
                 ps4.normalize_and_scale(diff_img))
 
+
+
 def interpolate(img_a, img_b, t_seq, levels, k_size, k_type, sigma, interpolation, border_mode):
     U, V = ps4.hierarchical_lk(img_a, img_b, levels, k_size, k_type, sigma, interpolation, border_mode)
     seq = []
     seq.append(img_a)
-    print(img_a.shape)
-
 
     for i in range(len(t_seq)):
         img_warp = ps4.warp(img_a, -(t_seq[i])*U, -(t_seq[i])*V, interpolation, border_mode)
@@ -340,8 +352,6 @@ def part_5a():
 
     cv2.imwrite(os.path.join(output_dir, "ps4-5-a-1.png"), combined_image)
 
-
-
 def part_5b():
     """Frame interpolation
 
@@ -356,12 +366,12 @@ def part_5b():
                                         'mc02.png'), 0) / 255.
 
     t_seq = [0.2,0.4,0.6,0.8,1]
-    combined_image, seq1 = interpolate(mc01, mc02, t_seq, 5, 31, "uniform", 0, cv2.INTER_CUBIC, cv2.BORDER_REFLECT101)
+    combined_image, seq1 = interpolate(mc01, mc02, t_seq, 5, 99, "gaussian", 4, cv2.INTER_CUBIC, cv2.BORDER_REFLECT101)
 
-    # i = 0
-    # for image in seq1:
-    #     cv2.imwrite(os.path.join(output_dir + "/5b1/", str(i) + ".png"), image)
-    #     i += 1
+    i = 0
+    for image in seq1:
+        cv2.imwrite(os.path.join(output_dir + "/5b1/", str(i) + ".png"), image)
+        i += 1
 
     cv2.imwrite(os.path.join(output_dir, "ps4-5-b-1.png"), combined_image)
 
@@ -371,13 +381,39 @@ def part_5b():
                                         'mc03.png'), 0) / 255.
 
     t_seq = [0.2,0.4,0.6,0.8,1]
-    combined_image,seq2 = interpolate(mc02, mc03, t_seq, 5, 31, "uniform", 0, cv2.INTER_CUBIC, cv2.BORDER_REFLECT101)
-    # i = 0
-    # for image in seq2:
-    #     cv2.imwrite(os.path.join(output_dir + "/5b2/", str(i) + ".png"), image)
-    #     i += 1
+    combined_image,seq2 = interpolate(mc02, mc03, t_seq, 5, 99, "gaussian", 4, cv2.INTER_CUBIC, cv2.BORDER_REFLECT101)
+    i = 0
+    for image in seq2:
+        cv2.imwrite(os.path.join(output_dir + "/5b2/", str(i) + ".png"), image)
+        i += 1
 
     cv2.imwrite(os.path.join(output_dir, "ps4-5-b-2.png"), combined_image)
+
+
+
+def mp4_video_writer(filename, frame_size, fps=20):
+    cc = cv2.VideoWriter_fourcc(*'MP4V')
+    return cv2.VideoWriter(filename, cc, fps, frame_size)
+
+
+def video_frame_generator(filename):
+    video = cv2.VideoCapture(filename)
+
+    while video.isOpened():
+        ret, frame = video.read()
+
+        if ret:
+            yield frame
+        else:
+            break
+
+    video.release()
+    yield None
+
+
+def save_image(filename, image):
+    cv2.imwrite(os.path.join(output_dir, filename), image)
+
 
 def part_6():
     """Challenge Problem
@@ -387,17 +423,68 @@ def part_6():
     Place all your work in this file and this section.
     """
 
-    raise NotImplementedError
+    # print("\nPart 6:")
+
+    video_file = "./input_videos/ps4-my-video.mp4"
+    frame_ids = [5, 250]
+    fps = 40
+
+    output_prefix = "ps4-6"
+    video_name = "ps4-6-video.mp4"
+
+    video = os.path.join(output_dir, video_file)
+    frames = int(cv2.VideoCapture(video).get(cv2.CAP_PROP_FRAME_COUNT))
+
+    image_gen = video_frame_generator(video)
+
+    image = image_gen.__next__()
+    h, w, d = image.shape
+
+    out_path = "ar_{}-{}".format(output_prefix[4:], video_name)
+    video_out = mp4_video_writer(out_path, (w, h), fps)
+
+    counter_init = 1
+    output_counter = counter_init
+
+    frame_num = 1
+
+    while image is not None:
+
+        # print("Processing frame {}/{}".format(frame_num, frames))
+
+        image_next = image_gen.__next__()
+        if image_next is None:
+            break
+
+        i1 = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)/255.
+        i2 = cv2.cvtColor(image_next, cv2.COLOR_BGR2GRAY)/255.
+
+        # u, v = ps4.hierarchical_lk(i1, i2, levels=6, k_size=15, k_type="gaussian", sigma=1, interpolation=cv2.INTER_CUBIC, border_mode=cv2.BORDER_REFLECT101)
+        u,v = ps4.optic_flow_lk(i1, i2, k_size=80, k_type="uniform", sigma=1)
+        u_v = quiver_on_img(image, u, v, scale=10, stride=12)
+
+        if frame_num in frame_ids:
+            out_str = output_prefix + "-{}.png".format(output_counter)
+            out_str = output_prefix + "-{}.png".format(output_counter)
+            save_image(out_str, image)
+            output_counter += 1
+
+        video_out.write(u_v)
+
+        image = image_next
+        frame_num += 1
+
+    video_out.release()
 
 
 if __name__ == '__main__':
-    # part_1a()
-    # part_1b()
-    # part_2()
-    # part_3a_1()
-    # part_3a_2()
-    # part_4a()
-    # part_4b()
+    part_1a()
+    part_1b()
+    part_2()
+    part_3a_1()
+    part_3a_2()
+    part_4a()
+    part_4b()
     part_5a()
     part_5b()
-    # part_6()
+    part_6()
