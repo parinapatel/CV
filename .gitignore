@@ -46,4 +46,6 @@ crashlytics.properties
 crashlytics-build.properties
 fabric.properties
 
+#Ignore venv
 venv
+__pycache__
