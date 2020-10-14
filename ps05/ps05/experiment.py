@@ -222,9 +222,9 @@ def part_2a():
                    59: os.path.join(output_dir, 'ps5-2-a-3.png'),
                    99: os.path.join(output_dir, 'ps5-2-a-4.png')}
 
-    num_particles = 0  # Define the number of particles
-    sigma_mse = 0  # Define the value of sigma for the measurement exponential equation
-    sigma_dyn = 0  # Define the value of sigma for the particles movement (dynamics)
+    num_particles = 400  # Define the number of particles
+    sigma_mse = 10.  # Define the value of sigma for the measurement exponential equation
+    sigma_dyn = 10. # Define the value of sigma for the particles movement (dynamics)
 
     run_particle_filter(ps5.ParticleFilter,  # particle filter model class
                         os.path.join(input_dir, "circle"),
@@ -244,9 +244,9 @@ def part_2b():
                    84: os.path.join(output_dir, 'ps5-2-b-3.png'),
                    99: os.path.join(output_dir, 'ps5-2-b-4.png')}
 
-    num_particles = 0  # Define the number of particles
-    sigma_mse = 0  # Define the value of sigma for the measurement exponential equation
-    sigma_dyn = 0  # Define the value of sigma for the particles movement (dynamics)
+    num_particles = 400  # Define the number of particles
+    sigma_mse = 10  # Define the value of sigma for the measurement exponential equation
+    sigma_dyn = 20  # Define the value of sigma for the particles movement (dynamics)
 
     run_particle_filter(ps5.ParticleFilter,  # particle filter model class
                         os.path.join(input_dir, "pres_debate_noisy"),
@@ -324,11 +324,11 @@ def part_6():
     raise NotImplementedError
 
 if __name__ == '__main__':
-    part_1b()
-    part_1c()
+    # part_1b()
+    # part_1c()
     part_2a()
     part_2b()
-    part_3()
-    part_4()
-    part_5()
-    part_6()
+    # part_3()
+    # part_4()
+    # part_5()
+    # part_6()

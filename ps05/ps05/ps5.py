@@ -114,13 +114,21 @@ class ParticleFilter(object):
         # The way to do it is:
         # self.some_parameter_name = kwargs.get('parameter_name', default_value)
 
-        self.template = template
+        self.template = self.get_gray_scale(template)
         self.frame = frame
-        self.particles = None  # Initialize your particles array. Read the docstring.
-        self.weights = None  # Initialize your weights array. Read the docstring.
+        max_x, max_y, _ = self.frame.shape
+        self.particles = np.array([np.random.choice(max_x, self.num_particles, True),
+                                   np.random.choice(max_y, self.num_particles, True)]).T  # Initialize your particles array. Read the docstring.
+        self.weights = np.ones(self.num_particles)/self.num_particles  # Initialize your weights array. Read the docstring.
         # Initialize any other components you may need when designing your filter.
 
-        raise NotImplementedError
+
+    def get_gray_scale(self, image):
+        B = image[:,:,0]
+        G = image[:,:,1]
+        R = image[:,:,2]
+
+        return 0.12*B + 0.58*G + 0.3*R
 
     def get_particles(self):
         """Returns the current particles state.
@@ -148,7 +156,14 @@ class ParticleFilter(object):
         Returns:
             float: similarity value.
         """
-        return NotImplementedError
+        x,y = template.shape
+        diff = np.subtract(template, frame_cutout, dtype=np.float32)
+        mse = np.sum(diff**2) / float(x*y)
+
+        similarity = np.exp(-mse / (2*( (self.sigma_exp)**2) ))
+
+        return similarity
+
 
     def resample_particles(self):
         """Returns a new set of particles
@@ -163,7 +178,11 @@ class ParticleFilter(object):
         Returns:
             numpy.array: particles data structure.
         """
-        return NotImplementedError
+        indices = np.random.choice(self.num_particles, len(self.particles), p=self.weights)
+        new_particles = np.array([self.particles[i] for i in indices])
+
+        return new_particles
+
 
     def process(self, frame):
         """Processes a video frame (image) and updates the filter's state.
@@ -183,7 +202,22 @@ class ParticleFilter(object):
         Returns:
             None.
         """
-        raise NotImplementedError
+        self.particles = self.particles + np.random.normal(0, self.sigma_dyn, self.particles.shape)
+
+        image = self.get_gray_scale(frame)
+        th, tw = np.shape(self.template)
+        ih, iw = np.shape(image)
+        centers = np.array([np.clip((self.particles[:, 0]-tw/2).astype(int), 0, iw - tw - 1),
+                            np.clip((self.particles[:, 1]-th/2).astype(int), 0, ih - th - 1)])
+
+        frame_cutouts = [image[centers[1,i]:centers[1,i] + th, centers[0,i]:centers[0,i] + tw] for i in range(self.num_particles)]
+
+        self.weights = np.array([self.get_error_metric(self.template, frame_cutout) for frame_cutout in frame_cutouts])
+        self.weights /= np.sum(self.weights)
+
+        self.particles = self.resample_particles()
+
+
 
     def render(self, frame_in):
         """Visualizes current particle filter state.
@@ -224,7 +258,30 @@ class ParticleFilter(object):
             y_weighted_mean += self.particles[i, 1] * self.weights[i]
 
         # Complete the rest of the code as instructed.
-        raise NotImplementedError
+
+        # circle for each particle
+        for i in range(self.num_particles):
+            cv2.circle(frame_in, (int(self.particles[i,0]), int(self.particles[i,1])), 1, (255,0,0), thickness=1)
+
+        # rectangle around the tracking window
+        th, tw = self.template.shape
+
+        start = (int(x_weighted_mean - tw/2), int(y_weighted_mean - th/2))
+        end = (int(x_weighted_mean + tw/2), int(y_weighted_mean + th/2))
+
+        cv2.rectangle(frame_in, start, end, (0,255,0), thickness=1)
+
+        # create distribution
+        # distance_mean = 0
+        point_mean = np.array([x_weighted_mean, y_weighted_mean])
+        distance_mean = np.sum(np.array([np.linalg.norm(self.particles[i] - point_mean)*self.weights[i] for i in range(self.num_particles)]))
+
+        # for i in range(self.num_particles):
+        #     distance_mean += np.linalg.norm(self.particles[i] - point_mean)*self.weights[i]
+
+        cv2.circle(frame_in, (int(x_weighted_mean), int(y_weighted_mean)), int(distance_mean), (255,255,0), thickness=2)
+
+        return frame_in
 
 
 class AppearanceModelPF(ParticleFilter):
