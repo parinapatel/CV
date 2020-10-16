@@ -114,7 +114,8 @@ class ParticleFilter(object):
         # The way to do it is:
         # self.some_parameter_name = kwargs.get('parameter_name', default_value)
 
-        self.template = self.get_gray_scale(template)
+        self.template = template
+        self.templateT = self.get_gray_scale(template)
         self.frame = frame
         max_x, max_y, _ = self.frame.shape
         self.particles = np.array([np.random.choice(max_x, self.num_particles, True),
@@ -160,7 +161,7 @@ class ParticleFilter(object):
         diff = np.subtract(template, frame_cutout, dtype=np.float32)
         mse = np.sum(diff**2) / float(x*y)
 
-        similarity = np.exp(-mse / (2*( (self.sigma_exp)**2) ))
+        similarity = np.exp(-mse / (2*(self.sigma_exp**2)))
 
         return similarity
 
@@ -178,7 +179,7 @@ class ParticleFilter(object):
         Returns:
             numpy.array: particles data structure.
         """
-        indices = np.random.choice(self.num_particles, len(self.particles), p=self.weights)
+        indices = np.random.choice(self.num_particles, len(self.particles), True, p=self.weights.T)
         new_particles = np.array([self.particles[i] for i in indices])
 
         return new_particles
@@ -203,16 +204,20 @@ class ParticleFilter(object):
             None.
         """
         self.particles = self.particles + np.random.normal(0, self.sigma_dyn, self.particles.shape)
+        iw, ih, _ = frame.shape
+        self.particles[:, 0] = np.clip(self.particles[:, 0], 0, iw - 1)
+        self.particles[:, 1] = np.clip(self.particles[:, 1], 0, ih - 1)
 
         image = self.get_gray_scale(frame)
-        th, tw = np.shape(self.template)
+        th, tw = np.shape(self.templateT)
         ih, iw = np.shape(image)
+
         centers = np.array([np.clip((self.particles[:, 0]-tw/2).astype(int), 0, iw - tw - 1),
                             np.clip((self.particles[:, 1]-th/2).astype(int), 0, ih - th - 1)])
 
         frame_cutouts = [image[centers[1,i]:centers[1,i] + th, centers[0,i]:centers[0,i] + tw] for i in range(self.num_particles)]
 
-        self.weights = np.array([self.get_error_metric(self.template, frame_cutout) for frame_cutout in frame_cutouts])
+        self.weights = np.array([self.get_error_metric(self.templateT, frame_cutout) for frame_cutout in frame_cutouts])
         self.weights /= np.sum(self.weights)
 
         self.particles = self.resample_particles()
@@ -264,7 +269,7 @@ class ParticleFilter(object):
             cv2.circle(frame_in, (int(self.particles[i,0]), int(self.particles[i,1])), 1, (255,0,0), thickness=1)
 
         # rectangle around the tracking window
-        th, tw = self.template.shape
+        th, tw = self.templateT.shape
 
         start = (int(x_weighted_mean - tw/2), int(y_weighted_mean - th/2))
         end = (int(x_weighted_mean + tw/2), int(y_weighted_mean + th/2))
@@ -280,8 +285,6 @@ class ParticleFilter(object):
         #     distance_mean += np.linalg.norm(self.particles[i] - point_mean)*self.weights[i]
 
         cv2.circle(frame_in, (int(x_weighted_mean), int(y_weighted_mean)), int(distance_mean), (255,255,0), thickness=2)
-
-        return frame_in
 
 
 class AppearanceModelPF(ParticleFilter):
@@ -306,6 +309,23 @@ class AppearanceModelPF(ParticleFilter):
         # The way to do it is:
         # self.some_parameter_name = kwargs.get('parameter_name', default_value)
 
+        self.image = self.get_gray_scale(frame)
+        self.templateT = self.get_gray_scale(template)
+
+        minY = self.template_rect['y']
+        minX = self.template_rect['x']
+        maxY = minY + self.template_rect['h']
+        maxX = minX + self.template_rect['w']
+
+        lowB = [minX, minY]
+        highB = [maxX, maxY]
+
+        self.particles = np.array([np.random.choice(np.arange(int(round(lowB[i])), int(round(highB[i]))), self.num_particles, True) for i in range(2)]).T
+
+    def get_gray_scale(self, image):
+        return cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+
+
     def process(self, frame):
         """Processes a video frame (image) and updates the filter's state.
 
@@ -319,7 +339,25 @@ class AppearanceModelPF(ParticleFilter):
         Returns:
             None.
         """
-        raise NotImplementedError
+        super(AppearanceModelPF, self).process(frame)
+
+        self.image = self.get_gray_scale(frame)
+        bestId = np.random.choice(np.arange(self.num_particles), 1, p=self.weights)
+        bestP = self.particles[bestId][0]
+
+        th, tw = self.templateT.shape
+        ih, iw = self.image.shape
+
+        minY = int(round(bestP[1] - th/2))
+        minX = int(round(bestP[0] - tw/2))
+        maxY = minY + th
+        maxX = minX + tw
+
+        bestT = self.image[minY:maxY, minX:maxX]
+
+        if self.alpha > 0 and bestT.shape == self.templateT.shape:
+            self.templateT = self.alpha * bestT + (1-self.alpha)*self.templateT
+            self.template = self.templateT
 
 
 class MDParticleFilter(AppearanceModelPF):

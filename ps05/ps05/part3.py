@@ -61,9 +61,9 @@ class KalmanFilter(object):
         # print(self.state[1])
         return self.state[0,0], self.state[0,1]
 
-
 class ParticleFilter(object):
     """A particle filter tracker.
+
     Encapsulating state, initialization and update methods. Refer to
     the method run_particle_filter( ) in experiment.py to understand
     how this class and methods work.
@@ -71,6 +71,7 @@ class ParticleFilter(object):
 
     def __init__(self, frame, template, **kwargs):
         """Initializes the particle filter object.
+
         The main components of your particle filter should at least be:
         - self.particles (numpy.array): Here you will store your particles.
                                         This should be a N x 2 array where
@@ -87,6 +88,7 @@ class ParticleFilter(object):
                                        frame that will be used as the template
                                        to track.
         - self.frame (numpy.array): Current image frame.
+
         Args:
             frame (numpy.array): color BGR uint8 image of initial video frame,
                                  values in [0, 255].
@@ -111,7 +113,8 @@ class ParticleFilter(object):
         # The way to do it is:
         # self.some_parameter_name = kwargs.get('parameter_name', default_value)
 
-        self.template = self.get_gray_scale(template)
+        self.template = template
+        self.model = self.get_gray_scale(template)
         self.frame = frame
         max_x, max_y, _ = self.frame.shape
         self.particles = np.array([np.random.choice(max_x, self.num_particles, True),
@@ -129,7 +132,9 @@ class ParticleFilter(object):
 
     def get_particles(self):
         """Returns the current particles state.
+
         This method is used by the autograder. Do not modify this function.
+
         Returns:
             numpy.array: particles data structure.
         """
@@ -137,7 +142,9 @@ class ParticleFilter(object):
 
     def get_weights(self):
         """Returns the current particle filter's weights.
+
         This method is used by the autograder. Do not modify this function.
+
         Returns:
             numpy.array: weights data structure.
         """
@@ -145,57 +152,71 @@ class ParticleFilter(object):
 
     def get_error_metric(self, template, frame_cutout):
         """Returns the error metric used based on the similarity measure.
+
         Returns:
             float: similarity value.
         """
+        x,y = template.shape
+        diff = np.subtract(template, frame_cutout, dtype=np.float32)
+        mse = np.sum(diff**2) / float(x*y)
 
+        similarity = np.exp(-mse / (2*(self.sigma_exp**2)))
+
+        return similarity
 
 
     def resample_particles(self):
         """Returns a new set of particles
+
         This method does not alter self.particles.
+
         Use self.num_particles and self.weights to return an array of
         resampled particles based on their weights.
+
         See np.random.choice or np.random.multinomial.
+
         Returns:
             numpy.array: particles data structure.
         """
-        indices = np.random.choice(self.num_particles, len(self.particles), p=self.weights)
+        indices = np.random.choice(self.num_particles, len(self.particles), True, p=self.weights.T)
         new_particles = np.array([self.particles[i] for i in indices])
 
         return new_particles
 
-    def update_weights(self, image):
-        th, tw = np.shape(self.template)
-        ih, iw = np.shape(image)
-        centers = np.array([np.clip((self.particles[:, 0] - tw / 2).astype(int), 0, iw - tw - 1),
-                            np.clip((self.particles[:, 1] - th / 2).astype(int), 0, ih - th - 1)])
-
-        frame_cutouts = [image[centers[1, i]:centers[1, i] + th, centers[0, i]:centers[0, i] + tw] for i in
-                         range(self.num_particles)]
-
-        self.weights = np.array([self.get_error_metric(self.template, frame_cutout) for frame_cutout in frame_cutouts])
-        self.weights /= np.sum(self.weights)
-
 
     def process(self, frame):
         """Processes a video frame (image) and updates the filter's state.
+
         Implement the particle filter in this method returning None
         (do not include a return call). This function should update the
         particles and weights data structures.
+
         Make sure your particle filter is able to cover the entire area of the
         image. This means you should address particles that are close to the
         image borders.
+
         Args:
             frame (numpy.array): color BGR uint8 image of current video frame,
                                  values in [0, 255].
+
         Returns:
             None.
         """
         self.particles = self.particles + np.random.normal(0, self.sigma_dyn, self.particles.shape)
+        iw, ih, _ = frame.shape
+        self.particles[:, 0] = np.clip(self.particles[:, 0], 0, iw - 1)
+        self.particles[:, 1] = np.clip(self.particles[:, 1], 0, ih - 1)
 
         image = self.get_gray_scale(frame)
-        self.update_weights(image)
+        th, tw = np.shape(self.model)
+        ih, iw = np.shape(image)
+        centers = np.array([np.clip((self.particles[:, 0]-tw/2).astype(int), 0, iw - tw - 1),
+                            np.clip((self.particles[:, 1]-th/2).astype(int), 0, ih - th - 1)])
+
+        frame_cutouts = [image[centers[1,i]:centers[1,i] + th, centers[0,i]:centers[0,i] + tw] for i in range(self.num_particles)]
+
+        self.weights = np.array([self.get_error_metric(self.model, frame_cutout) for frame_cutout in frame_cutouts])
+        self.weights /= np.sum(self.weights)
 
         self.particles = self.resample_particles()
 
@@ -203,12 +224,16 @@ class ParticleFilter(object):
 
     def render(self, frame_in):
         """Visualizes current particle filter state.
+
         This method may not be called for all frames, so don't do any model
         updates here!
+
         These steps will calculate the weighted mean. The resulting values
         should represent the tracking window center point.
+
         In order to visualize the tracker's behavior you will need to overlay
         each successive frame with the following elements:
+
         - Every particle's (x, y) location in the distribution should be
           plotted by drawing a colored dot point on the image. Remember that
           this should be the center of the window, not the corner.
@@ -220,7 +245,9 @@ class ParticleFilter(object):
           particle to the weighted mean. Next, take the weighted sum of these
           distances and plot a circle centered at the weighted mean with this
           radius.
+
         This function should work for all particle filters in this problem set.
+
         Args:
             frame_in (numpy.array): copy of frame to render the state of the
                                     particle filter.
@@ -232,7 +259,6 @@ class ParticleFilter(object):
         for i in range(self.num_particles):
             x_weighted_mean += self.particles[i, 0] * self.weights[i]
             y_weighted_mean += self.particles[i, 1] * self.weights[i]
-            cv2.circle(frame_in, (x_weighted_mean.astype(int),y_weighted_mean.astype(int)), 2, (0,0,255), -1)
 
         # Complete the rest of the code as instructed.
 
@@ -241,7 +267,7 @@ class ParticleFilter(object):
             cv2.circle(frame_in, (int(self.particles[i,0]), int(self.particles[i,1])), 1, (255,0,0), thickness=1)
 
         # rectangle around the tracking window
-        th, tw = self.template.shape
+        th, tw = self.model.shape
 
         start = (int(x_weighted_mean - tw/2), int(y_weighted_mean - th/2))
         end = (int(x_weighted_mean + tw/2), int(y_weighted_mean + th/2))
@@ -261,17 +287,11 @@ class ParticleFilter(object):
         return frame_in
 
 
-class AppearanceModelPF(object):
+class AppearanceModelPF(ParticleFilter):
 
     def __init__(self, frame, template, **kwargs):
-        self.num_particles = kwargs.get('num_particles')  # required by the autograder
-        self.sigma_exp = kwargs.get('sigma_exp')  # required by the autograder
-        self.sigma_dyn = kwargs.get('sigma_dyn')  # required by the autograder, control std
-        self.template_rect = kwargs.get('template_coords')  # required by the autograder
+        super(AppearanceModelPF, self).__init__(frame, template, **kwargs)  # call base class constructor
 
-        self.template = template
-        self.frame = frame
-        self.alpha = 0
         self.alpha = kwargs.get('alpha')  # required by the autograder
 
         #defines the image
@@ -283,7 +303,7 @@ class AppearanceModelPF(object):
         maxYCoord = int(minYCoord + self.template_rect['h'])
         minXCoord = int(self.template_rect['x'])
         maxXCoord = int(minXCoord + self.template_rect['w'])
-        model = self.imageGray[minYCoord:maxYCoord, minXCoord:maxXCoord]
+        #model = self.imageGray[minYCoord:maxYCoord, minXCoord:maxXCoord]
         self.model = cv2.cvtColor(template, cv2.COLOR_BGR2GRAY)
         self.stateDims = kwargs.get('dism', 2)
 
@@ -293,84 +313,6 @@ class AppearanceModelPF(object):
         self.particles = np.array([np.random.uniform(minBound[i], maxBound[i],self.num_particles) for i in range(self.stateDims)]).T
         self.weights = np.ones(len(self.particles)) / len(self.particles)  # Initialize your weights array. Read the docstring.
         self.particleIdxs = np.arange(self.num_particles)
-
-    def get_particles(self):
-        """Returns the current particles state.
-
-        This method is used by the autograder. Do not modify this function.
-
-        Returns:
-            numpy.array: particles data structure.
-        """
-        return self.particles
-
-    def get_weights(self):
-        """Returns the current particle filter's weights.
-
-        This method is used by the autograder. Do not modify this function.
-
-        Returns:
-            numpy.array: weights data structure.
-        """
-        return self.weights
-
-    #this function is referenced at https://github.com/gkouros/intro-to-cv-ud810/blob/master/ps6_python/naive_pf_tracker.py#L59
-    def get_error_metric(self, template, frame_cutout):
-        """Returns the error metric used based on the similarity measure.
-
-        Returns:
-            float: similarity value.
-        """
-        if np.subtract(template.shape, frame_cutout.shape).any():
-            return 0.0
-        else:
-            mse = np.sum(np.subtract(template, frame_cutout, dtype=np.float32) ** 2)
-            mse /= float(template.shape[0] * template.shape[1])
-            prob = np.exp(-mse / 2 / self.sigma_exp**2)
-            return prob
-
-        # return NotImplementedError
-
-
-    def particleInitial(self):
-        # particleInitial particles using a normal distribution centered around 0, this sigma_dyn is the control std
-        noise = np.random.normal(0, self.sigma_dyn, self.particles.shape)
-        self.particles = self.particles + noise
-        imageWidth, imageHeight = self.imageSize[:2]
-        self.particles[:,0] = np.clip(self.particles[:,0], 0, imageWidth - 1)
-        self.particles[:,1] = np.clip(self.particles[:,1], 0, imageHeight - 1)
-
-
-    def compareParticle_Model(self, img):
-
-        modelHeight, modelWidth = self.model.shape[:2]
-        minXCoord = (self.particles[:,0] - modelWidth/2)
-        minYCoord = (self.particles[:,1] - modelHeight/2)
-        minXCoord = np.array([round(i,0) for i in minXCoord]).astype(np.int)
-        minYCoord = np.array([round(i,0) for i in minYCoord]).astype(np.int)
-
-        maxXCoord = minXCoord + modelWidth
-        maxYCoord = minYCoord + modelHeight
-
-
-        # maxXCoord = np.array([round(i,0) for i in maxXCoord]).astype(np.int)
-        # maxYCoord = np.array([round(i,0) for i in maxYCoord]).astype(np.int)
-        # construct a list contains all possible similar template created by particle filters
-        particleTemplates = [0] * self.num_particles
-        # get the particle arounding potential template
-        for i in range(self.num_particles):
-            temp = img[minYCoord[i]:maxYCoord[i], minXCoord[i]:maxXCoord[i]]
-            particleTemplates[i] = temp
-        # construct a list contains the weights, compute importance weight - similarity of each patch to the model
-        self.weights = np.array([self.get_error_metric(self.model, particleTemplate) for particleTemplate in particleTemplates])
-        # normalize the weights
-        sum_weights = np.sum(self.weights)
-        self.weights = self.weights/sum_weights
-
-
-    def resample_particles(self):
-        j = np.random.choice(self.particleIdxs, self.num_particles, True, p=self.weights.T)
-        self.particles = np.array(self.particles[j])
 
     def returnBestParticle(self):
 
@@ -398,47 +340,9 @@ class AppearanceModelPF(object):
     def process(self, frame):
 
         self.imageGray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        self.particleInitial()
-        self.compareParticle_Model(self.imageGray)
 
-        self.resample_particles()
+        super(AppearanceModelPF, self).process(frame)
+
         self.returnBestParticle()
         if self.alpha > 0:
             self.particleDecidedModel(self.imageGray)
-
-
-    # this code is referrence at https://github.com/gkouros/intro-to-cv-ud810/blob/master/ps6_python/naive_pf_tracker.py#L59
-    def render(self, frame_in):
-        x_weighted_mean = 0
-        y_weighted_mean = 0
-
-        for i in range(self.num_particles):
-            x_weighted_mean += self.particles[i, 0] * self.weights[i]
-            y_weighted_mean += self.particles[i, 1] * self.weights[i]
-            cv2.circle(frame_in, (x_weighted_mean.astype(int),y_weighted_mean.astype(int)), 2, (0,0,255), -1)
-
-        # Complete the rest of the code as instructed.
-
-        # circle for each particle
-        for i in range(self.num_particles):
-            cv2.circle(frame_in, (int(self.particles[i,0]), int(self.particles[i,1])), 1, (255,0,0), thickness=1)
-
-        # rectangle around the tracking window
-        th, tw = self.template.shape
-
-        start = (int(x_weighted_mean - tw/2), int(y_weighted_mean - th/2))
-        end = (int(x_weighted_mean + tw/2), int(y_weighted_mean + th/2))
-
-        cv2.rectangle(frame_in, start, end, (0,255,0), thickness=1)
-
-        # create distribution
-        # distance_mean = 0
-        point_mean = np.array([x_weighted_mean, y_weighted_mean])
-        distance_mean = np.sum(np.array([np.linalg.norm(self.particles[i] - point_mean)*self.weights[i] for i in range(self.num_particles)]))
-
-        # for i in range(self.num_particles):
-        #     distance_mean += np.linalg.norm(self.particles[i] - point_mean)*self.weights[i]
-
-        cv2.circle(frame_in, (int(x_weighted_mean), int(y_weighted_mean)), int(distance_mean), (255,255,0), thickness=2)
-
-
