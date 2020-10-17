@@ -264,12 +264,14 @@ def part_3():
                    50: os.path.join(output_dir, 'ps5-3-a-2.png'),
                    160: os.path.join(output_dir, 'ps5-3-a-3.png')}
 
-    num_particles = 0  # Define the number of particles
-    sigma_mse = 0  # Define the value of sigma for the measurement exponential equation
-    sigma_dyn = 0  # Define the value of sigma for the particles movement (dynamics)
-    alpha = 0  # Set a value for alpha
+    num_particles = 4000  # Define the number of particles
+    sigma_mse = 5  # Define the value of sigma for the measurement exponential equation
+    sigma_dyn = 20  # Define the value of sigma for the particles movement (dynamics)
+    alpha = 0.65  # Set a value for alpha
 
-    run_particle_filter(ps5.AppearanceModelPF,  # particle filter model class
+    i=0
+    for i in range(10):
+        run_particle_filter(ps5.AppearanceModelPF,  # particle filter model class
                         os.path.join(input_dir, "pres_debate"),
                         # input video
                         template_rect,
@@ -277,7 +279,11 @@ def part_3():
                         num_particles=num_particles, sigma_exp=sigma_mse,
                         sigma_dyn=sigma_dyn, alpha=alpha,
                         template_coords=template_rect)  # Add more if you need to
-
+        run_again = input("wanna run again?\n")
+        if run_again == "y":
+            continue
+        else:
+            break
 
 def part_4():
     template_rect = {'x': 210, 'y': 37, 'w': 103, 'h': 285}
@@ -326,9 +332,9 @@ def part_6():
 if __name__ == '__main__':
     # part_1b()
     # part_1c()
-    part_2a()
-    part_2b()
-    # part_3()
+    # part_2a()
+    # part_2b()
+    part_3()
     # part_4()
     # part_5()
     # part_6()
