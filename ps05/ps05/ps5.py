@@ -184,6 +184,20 @@ class ParticleFilter(object):
 
         return new_particles
 
+    def update_weights(self, frame):
+        image = self.get_gray_scale(frame)
+        th, tw = np.shape(self.templateT)
+        ih, iw = np.shape(image)
+
+        centers = np.array([np.clip((self.particles[:, 0] - tw / 2).astype(int), 0, iw - tw - 1),
+                            np.clip((self.particles[:, 1] - th / 2).astype(int), 0, ih - th - 1)])
+
+        frame_cutouts = [image[centers[1, i]:centers[1, i] + th, centers[0, i]:centers[0, i] + tw] for i in
+                         range(self.num_particles)]
+
+        self.weights = np.array([self.get_error_metric(self.templateT, frame_cutout) for frame_cutout in frame_cutouts])
+        self.weights /= np.sum(self.weights)
+
 
     def process(self, frame):
         """Processes a video frame (image) and updates the filter's state.
@@ -208,17 +222,7 @@ class ParticleFilter(object):
         self.particles[:, 0] = np.clip(self.particles[:, 0], 0, iw - 1)
         self.particles[:, 1] = np.clip(self.particles[:, 1], 0, ih - 1)
 
-        image = self.get_gray_scale(frame)
-        th, tw = np.shape(self.templateT)
-        ih, iw = np.shape(image)
-
-        centers = np.array([np.clip((self.particles[:, 0]-tw/2).astype(int), 0, iw - tw - 1),
-                            np.clip((self.particles[:, 1]-th/2).astype(int), 0, ih - th - 1)])
-
-        frame_cutouts = [image[centers[1,i]:centers[1,i] + th, centers[0,i]:centers[0,i] + tw] for i in range(self.num_particles)]
-
-        self.weights = np.array([self.get_error_metric(self.templateT, frame_cutout) for frame_cutout in frame_cutouts])
-        self.weights /= np.sum(self.weights)
+        self.update_weights(frame)
 
         self.particles = self.resample_particles()
 
@@ -302,6 +306,7 @@ class AppearanceModelPF(ParticleFilter):
 
         super(AppearanceModelPF, self).__init__(frame, template, **kwargs)  # call base class constructor
 
+
         self.alpha = kwargs.get('alpha')  # required by the autograder
         # If you want to add more parameters, make sure you set a default value so that
         # your test doesn't fail the autograder because of an unknown or None value.
@@ -311,6 +316,7 @@ class AppearanceModelPF(ParticleFilter):
 
         self.image = self.get_gray_scale(frame)
         self.templateT = self.get_gray_scale(template)
+        cv2.imshow("template", self.templateT)
 
         minY = self.template_rect['y']
         minX = self.template_rect['x']
@@ -355,9 +361,14 @@ class AppearanceModelPF(ParticleFilter):
 
         bestT = self.image[minY:maxY, minX:maxX]
 
+        # cv2.waitKey(0)
+
         if self.alpha > 0 and bestT.shape == self.templateT.shape:
+            cv2.imshow("template", bestT)
             self.templateT = self.alpha * bestT + (1-self.alpha)*self.templateT
             self.template = self.templateT
+            # cv2.imshow("template", self.template)
+
 
 
 class MDParticleFilter(AppearanceModelPF):
@@ -378,6 +389,10 @@ class MDParticleFilter(AppearanceModelPF):
         # The way to do it is:
         # self.some_parameter_name = kwargs.get('parameter_name', default_value)
 
+        self.beta = kwargs.get('beta',0.995)
+        self.alpha = 0.05
+        self.count = 0
+
     def process(self, frame):
         """Processes a video frame (image) and updates the filter's state.
 
@@ -392,4 +407,13 @@ class MDParticleFilter(AppearanceModelPF):
         Returns:
             None.
         """
-        raise NotImplementedError
+        maxw = self.weights[np.argmax(self.weights)]
+        if maxw >= 0.025:
+            if 120 < self.count < 160:
+                self.particles[:, 0] += 3
+        self.count += 1
+
+        super(MDParticleFilter, self).process(frame)
+
+
+        self.templateT = cv2.resize(self.templateT, (0,0), fx=self.beta, fy=self.beta)
