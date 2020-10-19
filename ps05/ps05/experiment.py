@@ -63,7 +63,7 @@ def run_particle_filter(filter_class, imgs_dir, template_rect,
             if 'template' in save_frames:
                 cv2.imwrite(save_frames['template'], template)
 
-            pf = filter_class(frame, template, **kwargs)
+            pf = filter_class(frame, template,**kwargs)
 
         # Process frame
         pf.process(frame)
@@ -85,6 +85,61 @@ def run_particle_filter(filter_class, imgs_dir, template_rect,
         if frame_num % 20 == 0:
             print('Working on frame {}'.format(frame_num))
 
+def run_multiple_pf(filter_class, imgs_dir, templates, save_frames={}, **kwargs):
+    """
+    templates : array of dictionaries with template_rect, start_frame, end_frame
+    """
+    imgs_list = [f for f in os.listdir(imgs_dir)
+                 if f[0] != '.' and f.endswith('.jpg')]
+    imgs_list.sort()
+
+    templates_init = [0]*len(templates)
+    pf_list = [0]*len(templates)
+    frame_num = 0
+    active_pf = [False]*len(templates)
+
+    for img in imgs_list:
+        frame = cv2.imread(os.path.join(imgs_dir, img))
+
+        active_pf = [True if t["start"] <= frame_num <= t["end"] else False for t in templates]
+
+        for i in range(len(templates)):
+            template = templates[i]
+
+            #  init on start frame (one time for each template)
+            if frame_num == template["start"]:
+                template_rect = template["template_rect"]
+                template_frame = frame[int(template_rect['y']):
+                                       int(template_rect['y'] + template_rect['h']),
+                                       int(template_rect['x']):
+                                       int(template_rect['x'] + template_rect['w'])]
+                templates_init[i] = template_frame
+                if 'template' in save_frames:
+                    cv2.imwrite(save_frames['template'+str(i)], template)
+
+                pf = filter_class(frame, template_frame,  template_coords=template["template_rect"], **kwargs)
+                if i == 1:
+                    pf.alpha = 0.05
+                pf_list[i] = pf
+
+            if active_pf[i]:
+                pf_list[i].process(frame)
+
+        if True:
+            out_frame = frame.copy()
+            for i in range(len(active_pf)):
+                if active_pf[i]:
+                    pf_list[i].render(out_frame)
+            cv2.imshow('Tracking', out_frame)
+            cv2.waitKey(1)
+            if frame_num in save_frames:
+                cv2.imwrite(save_frames[frame_num], out_frame)
+
+
+        # Update frame number
+        frame_num += 1
+        if frame_num % 20 == 0:
+            print('Working on frame {}'.format(frame_num))
 
 def run_kalman_filter(kf, imgs_dir, noise, sensor, save_frames={},
                       template_loc=None):
@@ -156,6 +211,82 @@ def run_kalman_filter(kf, imgs_dir, noise, sensor, save_frames={},
         if frame_num in save_frames:
             frame_out = frame.copy()
             cv2.circle(frame_out, (int(x), int(y)), 10, (255, 0, 0), 2)
+            cv2.imwrite(save_frames[frame_num], frame_out)
+
+        # Update frame number
+        frame_num += 1
+        if frame_num % 20 == 0:
+            print('Working on frame {}'.format(frame_num))
+
+
+def run_multiple_kf(imgs_dir, noise, templates, save_frames={}):
+
+    imgs_list = [f for f in os.listdir(imgs_dir)
+                 if f[0] != '.' and f.endswith('.jpg')]
+    imgs_list.sort()
+
+    frame_num = 0
+    numT = len(templates)
+
+    template_init = [0]*numT
+    kf = [0]*numT
+    active_kf = [False]*numT
+    observations = [0]*numT
+    states = [0]*numT
+
+    for img in imgs_list:
+
+        frame = cv2.imread(os.path.join(imgs_dir, img))
+
+        active_kf = [True if t["start"] <= frame_num <= t["end"] else False for t in templates]
+
+        for i in range(numT):
+            template_loc = templates[i]["template_rect"]
+            if templates[i]["start"] == frame_num:
+                template = frame[template_loc['y']:
+                                 template_loc['y'] + template_loc['h'],
+                                 template_loc['x']:
+                                 template_loc['x'] + template_loc['w']]
+                template_init[i] = template
+                kf[i] = ps5.KalmanFilter(template_loc['x'], template_loc['y'])
+
+            if active_kf[i]:
+                corr_map = cv2.matchTemplate(frame, template_init[i], cv2.TM_SQDIFF)
+                z_y, z_x = np.unravel_index(np.argmin(corr_map), corr_map.shape)
+
+                z_w = template_loc['w']
+                z_h = template_loc['h']
+
+                z_x += z_w // 2 + np.random.normal(0, noise['x'])
+                z_y += z_h // 2 + np.random.normal(0, noise['y'])
+
+                observations[i] = (z_x, z_y, z_w, z_h)
+
+                x, y = kf[i].process(z_x, z_y)
+                states[i] = (x, y)
+
+        if True:  # For debugging, it displays every frame
+            out_frame = frame.copy()
+            for i in range(numT):
+                if active_kf[i]:
+                    z_x, z_y, z_w, z_h = observations[i]
+                    x, y = states[i]
+                    cv2.circle(out_frame, (int(z_x), int(z_y)), 20, (0, 0, 255), 2)
+                    cv2.circle(out_frame, (int(x), int(y)), 10, (255, 0, 0), 2)
+                    cv2.rectangle(out_frame, (int(z_x) - z_w // 2, int(z_y) - z_h // 2),
+                                  (int(z_x) + z_w // 2, int(z_y) + z_h // 2),
+                                  (0, 0, 255), 2)
+
+            cv2.imshow('Tracking', out_frame)
+            cv2.waitKey(1)
+
+        # Render and save output, if indicated
+        if frame_num in save_frames:
+            frame_out = frame.copy()
+            for i in range(numT):
+                if active_kf[i]:
+                    x, y = states[i]
+                    cv2.circle(frame_out, (int(x), int(y)), 10, (255, 0, 0), 2)
             cv2.imwrite(save_frames[frame_num], frame_out)
 
         # Update frame number
@@ -264,14 +395,14 @@ def part_3():
                    50: os.path.join(output_dir, 'ps5-3-a-2.png'),
                    160: os.path.join(output_dir, 'ps5-3-a-3.png')}
 
-    num_particles = 4000  # Define the number of particles
-    sigma_mse = 5  # Define the value of sigma for the measurement exponential equation
-    sigma_dyn = 20  # Define the value of sigma for the particles movement (dynamics)
-    alpha = 0.65  # Set a value for alpha
+    num_particles = 1000  # Define the number of particles
+    sigma_mse = 2  # Define the value of sigma for the measurement exponential equation
+    sigma_dyn = 10  # Define the value of sigma for the particles movement (dynamics)
+    alpha = 0.2  # Set a value for alpha
 
-    i=0
-    for i in range(10):
-        run_particle_filter(ps5.AppearanceModelPF,  # particle filter model class
+    # i=0
+    # for i in range(10):
+    run_particle_filter(ps5.AppearanceModelPF,  # particle filter model class
                         os.path.join(input_dir, "pres_debate"),
                         # input video
                         template_rect,
@@ -279,11 +410,11 @@ def part_3():
                         num_particles=num_particles, sigma_exp=sigma_mse,
                         sigma_dyn=sigma_dyn, alpha=alpha,
                         template_coords=template_rect)  # Add more if you need to
-        run_again = input("wanna run again?\n")
-        if run_again == "y":
-            continue
-        else:
-            break
+        # run_again = input("wanna run again?\n")
+        # if run_again == "y":
+        #     continue
+        # else:
+        #     break
 
 def part_4():
     template_rect = {'x': 210, 'y': 37, 'w': 103, 'h': 285}
@@ -293,16 +424,18 @@ def part_4():
                    240: os.path.join(output_dir, 'ps5-4-a-3.png'),
                    300: os.path.join(output_dir, 'ps5-4-a-4.png')}
 
-    num_particles = 0  # Define the number of particles
-    sigma_md = 0  # Define the value of sigma for the measurement exponential equation
-    sigma_dyn = 0  # Define the value of sigma for the particles movement (dynamics)
+    num_particles = 400  # Define the number of particles
+    sigma_md = 5  # Define the value of sigma for the measurement exponential equation
+    sigma_dyn = 3  # Define the value of sigma for the particles movement (dynamics)
+    beta = 0.995
+
 
     run_particle_filter(ps5.MDParticleFilter,
                         os.path.join(input_dir, "pedestrians"),
                         template_rect,
                         save_frames,
                         num_particles=num_particles, sigma_exp=sigma_md,
-                        sigma_dyn=sigma_dyn,
+                        sigma_dyn=sigma_dyn, beta=beta,
                         template_coords=template_rect)  # Add more if you need to
 
 
@@ -317,7 +450,39 @@ def part_5():
 
     Place all your work in this file and this section.
     """
-    raise NotImplementedError
+    templates = [
+        {"template_rect": {'x': 80, 'y': 150, 'w': 80, 'h': 150},
+         "start": 0,
+         "end": 50},
+        {"template_rect": {'x': 300, 'y': 250, 'w': 30, 'h': 50},
+         "start": 0,
+         "end": 30},
+        {"template_rect": {'x': 2, 'y': 200, 'w': 45, 'h': 200},
+         "start": 25,
+         "end": 100}
+    ]
+
+    save_frames = {26: os.path.join(output_dir, 'ps5-5-a-1.png'),
+                   45: os.path.join(output_dir, 'ps5-5-a-2.png'),
+                   60: os.path.join(output_dir, 'ps5-5-a-3.png')}
+    # save_frames = {300: os.path.join(output_dir, 'test.png')}
+
+    num_particles = 1000
+    sigma_mse = 4
+    sigma_dyn = 15
+    alpha = 0.95
+
+    run_multiple_pf(ps5.AppearanceModelPF,
+                    os.path.join(input_dir, "TUDCampus"),
+                    templates,
+                    save_frames,
+                    num_particles=num_particles, sigma_exp=sigma_mse,
+                    sigma_dyn=sigma_dyn, alpha=alpha)
+    #
+    # run_multiple_kf(os.path.join(input_dir, "TUDCampus"),
+    #                 NOISE_2,
+    #                 templates,
+    #                 save_frames)
 
 
 def part_6():
@@ -334,7 +499,7 @@ if __name__ == '__main__':
     # part_1c()
     # part_2a()
     # part_2b()
-    part_3()
+    # part_3()
     # part_4()
-    # part_5()
+    part_5()
     # part_6()
