@@ -113,6 +113,7 @@ def run_multiple_pf(filter_class, imgs_dir, templates, save_frames={}, **kwargs)
                                        int(template_rect['y'] + template_rect['h']),
                                        int(template_rect['x']):
                                        int(template_rect['x'] + template_rect['w'])]
+                # cv2.imshow("",template_frame)
                 templates_init[i] = template_frame
                 if 'template' in save_frames:
                     cv2.imwrite(save_frames['template'+str(i)], template)
@@ -492,7 +493,33 @@ def part_6():
 
     Place all your work in this file and this section.
     """
-    raise NotImplementedError
+    templates = [
+        {"template_rect": {'x': 85, 'y': 31, 'w': 50, 'h': 200},
+         "start": 0,
+         "end": 116},
+        {"template_rect": {'x': 164, 'y': 53, 'w': 50, 'h': 150},
+         "start": 127,
+         "end": 400}
+    ]
+
+
+    save_frames = {30: os.path.join(output_dir, 'ps5-6-a-1.png'),
+                   60: os.path.join(output_dir, 'ps5-6-a-2.png'),
+                   140: os.path.join(output_dir, 'ps5-6-a-3.png')}
+    # save_frames = {300: os.path.join(output_dir, 'test.png')}
+
+    num_particles = 400
+    sigma_mse = 5
+    sigma_dyn = 20
+    alpha = 0.9
+
+    run_multiple_pf(ps5.ParticleFilter,
+                    os.path.join(input_dir, "follow"),
+                    templates,
+                    save_frames,
+                    num_particles=num_particles, sigma_exp=sigma_mse,
+                    sigma_dyn=sigma_dyn, alpha=alpha)
+
 
 if __name__ == '__main__':
     # part_1b()
@@ -501,5 +528,5 @@ if __name__ == '__main__':
     # part_2b()
     # part_3()
     # part_4()
-    part_5()
-    # part_6()
+    # part_5()
+    part_6()
