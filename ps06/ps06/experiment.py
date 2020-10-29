@@ -93,7 +93,7 @@ def part_1a_1b():
 
 def part_1c():
     p = 0.5  # Select a split percentage value
-    k = 5  # Select a value for k
+    k = 2  # Select a value for k
 
     size = [32, 32]
     X, y = ps6.load_images(YALE_FACES_DIR, size)
@@ -153,8 +153,9 @@ def part_2a():
     # Picking random numbers
     rand_y = np.random.choice([-1, 1], (len(ytrain)))
     # TODO: find which of these labels match ytrain and report its accuracy
-    rand_accuracy = None
-    raise NotImplementedError
+    correct = sum([1 if ytrain[i] == rand_y[i] else 0 for i in range(len(ytrain))])
+    total = len(ytrain)
+    rand_accuracy = 100.0*correct/total
     print('(Random) Training accuracy: {0:.2f}%'.format(rand_accuracy))
 
     # Using Weak Classifier
@@ -164,7 +165,9 @@ def part_2a():
     wk_results = [wk_clf.predict(x) for x in Xtrain]
     # TODO: find which of these labels match ytrain and report its accuracy
     wk_accuracy = None
-    raise NotImplementedError
+    correct_weak = sum([1 if ytrain[i] == wk_results[i] else 0 for i in range(len(ytrain))])
+    total_weak = len(ytrain)
+    wk_accuracy = 100.0*correct_weak/total_weak
     print('(Weak) Training accuracy {0:.2f}%'.format(wk_accuracy))
 
     num_iter = 5
@@ -175,24 +178,31 @@ def part_2a():
     boost_accuracy = 100 * float(good) / (good + bad)
     print('(Boosting) Training accuracy {0:.2f}%'.format(boost_accuracy))
 
+
     # Picking random numbers
     rand_y = np.random.choice([-1, 1], (len(ytest)))
     # TODO: find which of these labels match ytest and report its accuracy
     rand_accuracy = None
-    raise NotImplementedError
+    correct = sum([1 if ytest[i] == rand_y[i] else 0 for i in range(len(ytest))])
+    total = len(ytest)
+    rand_accuracy = 100.0 * correct / total
     print('(Random) Testing accuracy: {0:.2f}%'.format(rand_accuracy))
 
     # Using Weak Classifier
     wk_results = [wk_clf.predict(x) for x in Xtest]
     # TODO: find which of these labels match ytest and report its accuracy
     wk_accuracy = None
-    raise NotImplementedError
+    correct_weak = sum([1 if ytest[i] == wk_results[i] else 0 for i in range(len(ytest))])
+    total_weak = len(ytest)
+    wk_accuracy = 100.0 * correct_weak / total_weak
     print('(Weak) Testing accuracy {0:.2f}%'.format(wk_accuracy))
 
     y_pred = boost.predict(Xtest)
     # TODO: find which of these labels match ytest and report its accuracy
     boost_accuracy = None
-    raise NotImplementedError
+    correct_boost = sum([1 if ytest[i] == y_pred[i] else 0 for i in range(len(ytest))])
+    total_boost = len(ytest)
+    boost_accuracy = 100.0 * correct_boost / total_boost
     print('(Boosting) Testing accuracy {0:.2f}%'.format(boost_accuracy))
 
 
@@ -201,10 +211,20 @@ def part_3a():
     instructions document."""
 
     feature1 = ps6.HaarFeature((2, 1), (25, 30), (50, 100))
-    feature1.preview((200, 200), filename="ps6-3-a-1.png")
+    feature1.preview((200, 200), filename="ps6-3-a-1")
 
     # TODO: Generate and save all required images
-    raise NotImplementedError
+    feature2 = ps6.HaarFeature((1, 2), (10, 25), (50, 150))
+    feature2.preview((200, 200), filename="ps6-3-a-2")
+
+    feature3 = ps6.HaarFeature((3, 1), (50, 50), (100, 50))
+    feature3.preview((200, 200), filename="ps6-3-a-3")
+
+    feature4 = ps6.HaarFeature((1, 3), (50, 125), (100, 50))
+    feature4.preview((200, 200), filename="ps6-3-a-4")
+
+    feature5 = ps6.HaarFeature((2, 2), (50, 25), (100, 150))
+    feature5.preview((200, 200), filename="ps6-3-a-5")
 
 
 def part_4_a_b():
@@ -263,8 +283,8 @@ def part_4_c():
 
 if __name__ == "__main__":
     part_1a_1b()
-    # part_1c()
-    # part_2a()
-    # part_3a()
-    # part_4_a_b()
-    # part_4_c()
+    part_1c()
+    part_2a()
+    part_3a()
+    part_4_a_b()
+    part_4_c()

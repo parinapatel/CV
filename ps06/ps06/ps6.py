@@ -2,6 +2,7 @@
 import numpy as np
 import cv2
 import os
+import math
 
 from helper_classes import WeakClassifier, VJ_Classifier
 
@@ -26,14 +27,16 @@ def load_images(folder, size=(32, 32)):
     X = []
     y = []
 
+    size = tuple(size)
+
     for file in images_files:
         image = cv2.imread(os.path.join(folder, file))
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         resized = cv2.resize(gray, size)
         resized_flat = resized.flatten()
         X.append(resized_flat)
-        label = file.split('.')[0][:-2]
-        y.append(label)
+        label = file.split('.')[0][-2:]
+        y.append(int(label))
     X = np.array(X)
     y = np.array(y)
 
@@ -62,7 +65,15 @@ def split_dataset(X, y, p):
             ytest (numpy.array): Test data labels.
     """
 
-    raise NotImplementedError
+    total = X.shape[0]
+    N = int(p*total)
+    index = np.random.permutation(total)
+    Xtrain = X[index[:N], :]
+    Xtest = X[index[N:], :]
+    ytrain = y[index[:N]]
+    ytest = y[index[N:]]
+
+    return Xtrain, ytrain, Xtest, ytest
 
 
 def get_mean_face(x):
@@ -156,7 +167,21 @@ class Boosting:
 
     def train(self):
         """Implement the for loop shown in the problem set instructions."""
-        raise NotImplementedError
+        for j in range(self.num_iterations):
+            self.weights /= np.sum(self.weights)
+            weakC = WeakClassifier(self.Xtrain, self.ytrain, self.weights, self.eps)
+            weakC.train()
+            weakC_results = [weakC.predict(x) for x in self.Xtrain]
+            eps = np.sum([self.weights[i] if self.ytrain[i] != weakC_results[i] else 0 for i in range(len(self.ytrain))])
+            alpha = 0.5*math.log((1.-eps)/eps)
+
+            self.weakClassifiers.append(weakC)
+            self.alphas.append(alpha)
+            if eps >= self.eps:
+                for i in range(self.num_obs):
+                    self.weights[i] *= math.exp((-1)*self.ytrain[i]*self.alphas[j]*weakC.predict(self.Xtrain[i]))
+            else:
+                break
 
     def evaluate(self):
         """Return the number of correct and incorrect predictions.
@@ -170,7 +195,11 @@ class Boosting:
                 correct (int): Number of correct predictions.
                 incorrect (int): Number of incorrect predictions.
         """
-        raise NotImplementedError
+        predictions = self.predict(self.Xtrain)
+        correct = np.sum([1 if self.ytrain[i]==predictions[i] else 0 for i in range(len(self.ytrain))])
+        incorrect = np.sum([1 if self.ytrain[i]!=predictions[i] else 0 for i in range(len(self.ytrain))])
+
+        return correct, incorrect
 
     def predict(self, X):
         """Return predictions for a given array of observations.
@@ -184,8 +213,11 @@ class Boosting:
         Returns:
             numpy.array: Predictions, one for each row in X.
         """
-        raise NotImplementedError
-
+        predictions = [np.sign(np.sum(
+            [self.alphas[j]*self.weakClassifiers[j].predict(X[i]) for j in range(len(self.alphas))]
+        )) for i in range(X.shape[0])]
+        predictions = np.array(predictions)
+        return predictions
 
 class HaarFeature:
     """Haar-like features.
@@ -218,7 +250,14 @@ class HaarFeature:
             numpy.array: Image containing a Haar feature. (uint8).
         """
 
-        raise NotImplementedError
+        img = np.zeros(shape)
+        r, c = self.position
+        h, w = self.size
+        divide = int(h/2)
+        img[r:r+divide, c:c+w] = 255
+        img[r+divide:r+h, c:c+w] = 126
+
+        return img
 
     def _create_two_vertical_feature(self, shape):
         """Create a feature of type (1, 2).
@@ -232,7 +271,14 @@ class HaarFeature:
             numpy.array: Image containing a Haar feature. (uint8).
         """
 
-        raise NotImplementedError
+        img = np.zeros(shape)
+        r, c = self.position
+        h, w = self.size
+        divide = int(w/2)
+        img[r:r + h, c:c + divide] = 255
+        img[r:r + h, c + divide:c + w] = 126
+
+        return img
 
     def _create_three_horizontal_feature(self, shape):
         """Create a feature of type (3, 1).
@@ -246,7 +292,15 @@ class HaarFeature:
             numpy.array: Image containing a Haar feature. (uint8).
         """
 
-        raise NotImplementedError
+        img = np.zeros(shape)
+        r, c = self.position
+        h, w = self.size
+        divide = int(h/3)
+        img[r:r + divide, c:c + w] = 255
+        img[r + divide:r + 2*divide, c:c + w] = 126
+        img[r + 2*divide:r + h, c:c + w] = 255
+
+        return img
 
     def _create_three_vertical_feature(self, shape):
         """Create a feature of type (1, 3).
@@ -260,7 +314,15 @@ class HaarFeature:
             numpy.array: Image containing a Haar feature. (uint8).
         """
 
-        raise NotImplementedError
+        img = np.zeros(shape)
+        r, c = self.position
+        h, w = self.size
+        divide = int(w/3)
+        img[r:r + h, c:c + divide] = 255
+        img[r:r + h, c + divide:c + 2*divide] = 126
+        img[r:r + h, c + 2*divide:c + w] = 255
+
+        return img
 
     def _create_four_square_feature(self, shape):
         """Create a feature of type (2, 2).
@@ -274,7 +336,18 @@ class HaarFeature:
             numpy.array: Image containing a Haar feature. (uint8).
         """
 
-        raise NotImplementedError
+        img = np.zeros(shape)
+        r, c = self.position
+        h, w = self.size
+        dh = int(h/2)
+        dw = int(w/2)
+
+        img[r:r+dh, c:c+dw] = 126
+        img[r:r+dh, c+dw:c+w] = 255
+        img[r+dh:r+h, c:c+dw] = 255
+        img[r+dh:r+h, c+dw:c+w] = 126
+
+        return img
 
     def preview(self, shape=(24, 24), filename=None):
         """Return an image with a Haar-like feature of a given type.
@@ -339,7 +412,55 @@ class HaarFeature:
             float: Score value.
         """
 
-        raise NotImplementedError
+        def get_area(pt1, pt2):
+            r1, c1 = pt1
+            r2, c2 = pt2
+            h = r2 - r1
+            w = c2 - c1
+            # pt1, pt3 (next line) pt4, pt2
+            pt3 = (r1, c1 + w)
+            pt4 = (r1 + h, c1)
+
+            area = ii[pt1] + ii[pt2] - ii[pt3] - ii[pt4]
+
+            return area
+
+        ii = ii.astype(np.float32)
+        h, w = self.size
+        r, c = self.position
+
+        if self.feat_type == (2, 1):
+            dh = int(h / 2)
+            A = get_area((r - 1, c - 1), (r + dh - 1, c + w - 1))
+            B = get_area((r + dh - 1, c - 1), (r + h - 1, c + w - 1))
+            return A - B
+        if self.feat_type == (1, 2):
+            dw = int(w / 2)
+            A = get_area((r - 1, c - 1), (r + h - 1, c + dw - 1))
+            B = get_area((r - 1, c + dw - 1), (r + h - 1, c + w - 1))
+            return A - B
+        if self.feat_type == (3, 1):
+            dh = int(h / 3)
+            A = get_area((r - 1, c - 1), (r + dh - 1, c + w - 1))
+            B = get_area((r + dh - 1, c - 1), (r + 2 * dh - 1, c + w - 1))
+            C = get_area((r + 2 * dh - 1, c - 1), (r + h - 1, c + w - 1))
+            return A + C - B
+        if self.feat_type == (1, 3):
+            dw = int(w / 3)
+            A = get_area((r - 1, c - 1), (r + h - 1, c + dw - 1))
+            B = get_area((r - 1, c + dw - 1), (r + h - 1, c + 2 * dw - 1))
+            C = get_area((r - 1, c + 2 * dw - 1), (r + h - 1, c + w - 1))
+            return A + C - B
+        if self.feat_type == (2, 2):
+            dh = int(h / 2)
+            dw = int(w / 2)
+            A = get_area((r - 1, c - 1), (r + dh - 1, c + dw - 1))
+            B = get_area((r - 1, c + dw - 1), (r + dh - 1, c + w - 1))
+            C = get_area((r + dh - 1, c - 1), (r + h - 1, c + dw - 1))
+            D = get_area((r + dh - 1, c + dw - 1), (r + h - 1, c + w - 1))
+            return B + C - A - D
+
+        return 0
 
 
 def convert_images_to_integral_images(images):
@@ -352,7 +473,11 @@ def convert_images_to_integral_images(images):
         (list): List of integral images.
     """
 
-    raise NotImplementedError
+    outputs = []
+    for image in images:
+        output = np.cumsum(np.cumsum(image, axis=0), axis=1)
+        outputs.append(output)
+    return outputs
 
 
 class ViolaJones:
