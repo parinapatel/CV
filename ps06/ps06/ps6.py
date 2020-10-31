@@ -545,7 +545,21 @@ class ViolaJones:
 
             # TODO: Complete the Viola Jones algorithm
 
-            raise NotImplementedError
+            weights /= np.sum(weights)
+            weakC = VJ_Classifier(scores, self.labels, weights)
+            weakC.train()
+            err = weakC.error
+            # eps = np.sum(
+            #     [self.weights[i] if self.ytrain[i] != weakC_results[i] else 0 for i in range(len(self.ytrain))])
+
+            beta = err/(1.-err)
+            self.classifiers.append(weakC)
+            for j in range(len(self.integralImages)):
+                if self.labels[j] == weakC.predict(scores[j]):
+                    weights[i] *= beta
+
+            alpha = np.log(1.0/beta)
+            self.alphas.append(alpha)
 
     def predict(self, images):
         """Return predictions for a given list of images.
@@ -563,14 +577,16 @@ class ViolaJones:
 
         # Populate the score location for each classifier 'clf' in
         # self.classifiers.
-
-        # Obtain the Haar feature id from clf.feature
-
-        # Use this id to select the respective feature object from
-        # self.haarFeatures
-
-        # Add the score value to score[x, feature id] calling the feature's
-        # evaluate function. 'x' is each image in 'ii'
+        for i, img in enumerate(ii):
+            for clf in self.classifiers:
+                # Obtain the Haar feature id from clf.feature
+                f_id = clf.feature
+                # Use this id to select the respective feature object from
+                # self.haarFeatures
+                feat = self.haarFeatures[f_id]
+                # Add the score value to score[x, feature id] calling the feature's
+                # evaluate function. 'x' is each image in 'ii'
+                scores[i, f_id] = feat.evaluate(img)
 
         result = []
 
@@ -579,7 +595,15 @@ class ViolaJones:
 
         for x in scores:
             # TODO
-            raise NotImplementedError
+            s = 0.
+            for i in range(len(self.classifiers)):
+                s += self.alphas[i]*self.classifiers[i].predict(x)
+            alpha_sum = 0.5*np.sum(self.alphas)
+
+            if s >= alpha_sum:
+                result.append(1)
+            else:
+                result.append(-1)
 
         return result
 
@@ -598,5 +622,36 @@ class ViolaJones:
         Returns:
             None.
         """
+        gray_img = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
-        raise NotImplementedError
+        sr, sc = 24, 24
+        h, w = gray_img.shape
+
+        windows = []
+        cp_1 = []
+        cp_2 = []
+        for r in range(h-sr):
+            for c in range(w-sc):
+                cp_1.append((c, r))
+                cp_2.append((c+sc, r+sr))
+                window = gray_img[r:r + sr, c:c + sc]
+                windows.append(window)
+
+        predictions = self.predict(windows)
+
+        p1 = []
+        p2 = []
+        for i in range(len(predictions)):
+            if predictions[i] > 0:
+                p1.append(cp_1[i])
+                p2.append(cp_2[i])
+        rect_p1 = tuple(np.mean(p1, axis=0).astype(np.int))
+        rect_p2 = tuple(np.mean(p2, axis=0).astype(np.int))
+
+        cv2.rectangle(image, rect_p1, rect_p2, (0, 255, 0), 2)
+
+        if filename is None:
+            cv2.imwrite("output/VJ_facedetection.png", image)
+
+        else:
+            cv2.imwrite("output/{}.png".format(filename), image)

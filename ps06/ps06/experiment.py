@@ -248,7 +248,9 @@ def part_4_a_b():
 
     predictions = VJ.predict(images)
     vj_accuracy = None
-    raise NotImplementedError
+    correct = sum([1 if labels[i] == predictions[i] else 0 for i in range(len(labels))])
+    total = len(labels)
+    vj_accuracy = 100.0 * correct / total
     print("Prediction accuracy on training: {0:.2f}%".format(vj_accuracy))
 
     neg = load_images_from_dir(NEG2_DIR)
@@ -260,7 +262,9 @@ def part_4_a_b():
     predictions = VJ.predict(test_images)
 
     vj_accuracy = None
-    raise NotImplementedError
+    correct = sum([1 if real_labels[i] == predictions[i] else 0 for i in range(len(real_labels))])
+    total = len(real_labels)
+    vj_accuracy = 100.0 * correct / total
     print("Prediction accuracy on testing: {0:.2f}%".format(vj_accuracy))
 
 
