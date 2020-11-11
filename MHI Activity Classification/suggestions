@@ -1,0 +1,5 @@
+use median filtering for extracting the background
+
+create a function to get hu moments from video portions
+
+create a function to build the entire dataset with mus and vs and then store it in numpy arrays
