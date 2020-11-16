@@ -3,3 +3,17 @@ use median filtering for extracting the background
 create a function to get hu moments from video portions
 
 create a function to build the entire dataset with mus and vs and then store it in numpy arrays
+
+
+"""
+1. Build Dataset
+2. Save it as numpy
+3. Load from numpy
+4. create KNN
+5. train model
+    -> Here I am just using scale invariant features - v
+6. create features from test video
+7. test model
+8. create output video
+9. create confusion matrix
+"""
