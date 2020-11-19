@@ -3,7 +3,10 @@ import cv2
 import numpy as np
 from joblib import delayed, Parallel
 
-debug = False
+DEBUG = True
+SAVE_MHI = False
+IN_DIR = "input_videos"
+OUT_DIR = "output"
 
 
 # reference: assignment 3
@@ -27,7 +30,7 @@ def mp4_video_writer(filename, frame_size, fps=30):
     return cv2.VideoWriter(filename, fourcc, fps, frame_size)
 
 
-def create_mei_mhi(prev_frame, image_gen, current_frame, k, sigma, start_frame, end_frame, k_size, threshold, tau):
+def create_mei_mhi(prev_frame, image_gen, current_frame, k, sigma, start_frame, end_frame, k_size, threshold, tau, save=False, folder=None):
     # if image from previous sequence is not given take the image from this one
     if prev_frame is None:
         img = image_gen.__next__()
@@ -48,12 +51,16 @@ def create_mei_mhi(prev_frame, image_gen, current_frame, k, sigma, start_frame, 
     mei = np.zeros(img.shape, dtype=np.int32)
     mhi = np.zeros(img.shape, dtype=np.int32)
     reals = []
+    if save:
+        meis = []
+        mhis = []
 
     for frame_num in range(start_frame, end_frame + 1, 1):
         # print(num)
         current_img = image_gen.__next__()
 
         if current_img is None:
+            save = False
             break
         reals.append(current_img)
 
@@ -64,11 +71,17 @@ def create_mei_mhi(prev_frame, image_gen, current_frame, k, sigma, start_frame, 
 
         # create diff mei image
         binary_mei = np.zeros(img.shape, dtype=np.int32)
-        binary = np.abs(np.subtract(current_img, img))
+        binary = np.abs(cv2.subtract(current_img, img))
+        # binary = cv2.morphologyEx(binary, cv2.MORPH_OPEN, K)
         binary_mei[binary > threshold] = 1
+
+        if save:
+            meis.append(np.clip(binary_mei*255,0,255))
 
         # get mhi image
         mhi = create_mhi_frame(binary_mei, mhi, tau)
+        if save:
+            mhis.append(mhi*255)
 
         mei += binary_mei
 
@@ -76,6 +89,21 @@ def create_mei_mhi(prev_frame, image_gen, current_frame, k, sigma, start_frame, 
         num += 1
 
     mei[mei > 1] = 1
+
+    if save:
+        file_real = "real_{}_{}.png".format(start_frame, end_frame)
+        file_mei = "mei_{}_{}.png".format(start_frame, end_frame)
+        file_mei1 = "mei_agg_{}_{}.png".format(start_frame, end_frame)
+        file_mhi = "mhi_{}_{}.png".format(start_frame, end_frame)
+        gray = []
+        for real in reals:
+            gray.append(cv2.cvtColor(real, cv2.COLOR_BGR2GRAY))
+
+        # combined = cv2.vconcat([cv2.hconcat(gray), cv2.hconcat(meis), cv2.hconcat(mhis)])
+        cv2.imwrite(os.path.join(folder, file_real), cv2.hconcat(gray))
+        cv2.imwrite(os.path.join(folder, file_mei), cv2.hconcat(meis))
+        cv2.imwrite(os.path.join(folder, file_mei1), mei*255)
+        cv2.imwrite(os.path.join(folder, file_mhi), cv2.hconcat(mhis))
 
     return mei, mhi, reals
 
@@ -94,6 +122,14 @@ def hu_from_file(file, action, num, T, Th, j=0):
     hus_mhi = []
     labels = []
 
+    save_frames = False
+    folder = ""
+    if "person01" in file:
+        save_frames = True
+        folder = os.path.join(OUT_DIR,"{}".format(file.split("\\")[-1][:-4]))
+        if not os.path.exists(folder):
+            os.makedirs(folder)
+
     cap = cv2.VideoCapture(file)
 
     length = min(int(cap.get(cv2.CAP_PROP_FRAME_COUNT)), validator_video_size(file))
@@ -109,7 +145,7 @@ def hu_from_file(file, action, num, T, Th, j=0):
         end = int(start + T)
         sub_seq.append([start, end - 1])
 
-    if debug:
+    if DEBUG:
         print("Path: {}, Length: {}, Last sub-seq: {}".format(file, length, sub_seq[-1]))
 
     prev_frame = image_gen.__next__()
@@ -117,9 +153,9 @@ def hu_from_file(file, action, num, T, Th, j=0):
     for start, end in sub_seq:
 
         # get mei mhi and real images from the sequence
-        mei, mhi, real = create_mei_mhi(prev_frame, image_gen, start, k=(13, 13), sigma=1,
+        mei, mhi, real = create_mei_mhi(prev_frame, image_gen, start, k=(5,5), sigma=1,
                                         start_frame=start, end_frame=end,
-                                        k_size=(9, 9), threshold=Th, tau=T)
+                                        k_size=(3,3), threshold=Th, tau=T, save=save_frames, folder=folder)
 
         # last real image of the sequence will be the first previous frame for the next sequence
         prev_frame = real[-1]
@@ -145,6 +181,7 @@ def build_entire_dataset(actions, th, t, split_percent):
     for i, action in enumerate(actions):
         act = action[0]
         num = action[1]
+
         print("Creating dataset for " + act)
 
         files_path = [os.path.join("./Data MHI/" + str(act), x) for x in os.listdir("./Data MHI/" + str(act)) if
@@ -156,6 +193,10 @@ def build_entire_dataset(actions, th, t, split_percent):
         # for j, file in enumerate(files_path):
         # if ".avi" in file:
         # abs_path = os.path.join("./Data MHI/"+str(act)+"/",file)
+        if DEBUG:
+            print("Validation set for {}".format(action))
+            for idx in test_idx:
+                print(files_path[int(idx)])
 
         return_data = Parallel(n_jobs=4)(delayed(hu_from_file)(file, act, num, t[i], th[i]) for file in files_path)
         # hu_mhi, labels = hu_from_file(abs_path, act, num, T[i], Th[i], j)
@@ -213,144 +254,32 @@ def create_hu_moments(img):
     denom = mu00 ** (1+np.divide(np.sum(pq, axis=1, dtype=np.float32),2.))
     v = mu/denom
 
-    hus = np.array([
-        # 1
-        v[0] + v[1],
-        # 2
-        np.square(v[0] - v[1]) + (4 * np.square(v[2])),
-        # 3
-        np.square(v[6] - (3 * v[3])) + np.square((3 * v[4]) - v[7]),
-        # 4
-        np.square(v[6] + v[3]) + np.square(v[4] + v[7]),
-        # 5
-        ((v[6] - (3 * v[3])) * (v[6] + v[3]) * (
-                (np.square(v[6] + v[3])) - (3 * (np.square(v[4] + v[7])))
-        )) + ((3 * v[4] - v[7]) * (v[4] + v[7])) * (
-            (3 * (np.square(v[6] + v[3])) - (np.square(v[4] + v[7])))
-        ),
-        # 6
-        ((v[0] - v[1]) * (np.square(v[6] + v[3]) - np.square(v[4] + v[7]))) +
-        4 * v[2] * (v[6] + v[3]) * (v[4] + v[7])
-        # 7
-        # (((3*mu[4]) - mu[7])*(mu[4] + mu[7])*(
-        #     (3*(np.square(mu[6] + mu[3]))) - np.square(mu[4] + mu[7])
-        # )) - ((mu[6] - (3*mu[3]))*(mu[4] + mu[7])*(
-        #     (3*(np.square(mu[6] + mu[3]))) - np.square(mu[4] + mu[7])
-        # ))
+    hu1 = v[0] + v[1]
+    hu2 = np.square(v[0] - v[1]) + (4 * np.square(v[2]))
+    hu3 = np.square(v[6] - (3 * v[3])) + np.square((3 * v[4]) - v[7])
+    hu4 = np.square(v[6] + v[3]) + np.square(v[4] + v[7])
+    hu5 = ((v[6] - (3 * v[3])) * (v[6] + v[3]) * ((np.square(v[6] + v[3])) - (3 * (np.square(v[4] + v[7]))))) + ((3 * v[4] - v[7]) * (v[4] + v[7])) * (3 * (np.square(v[6] + v[3])) - (np.square(v[4] + v[7])))
+    hu6 = ((v[0] - v[1]) * (np.square(v[6] + v[3]) - np.square(v[4] + v[7]))) + 4 * v[2] * (v[6] + v[3]) * (v[4] + v[7])
+    #hu7 = (((3 * v[4]) - v[7]) * (v[4] + v[7]) * ((3 * (np.square(v[6] + v[3]))) - np.square(v[4] + v[7]))) - ((v[6] - (3 * v[3])) * (v[4] + v[7]) * ((3 * (np.square(v[6] + v[3]))) - np.square(v[4] + v[7])))
 
-        # (((3*mu[4]) - mu[7])*(mu[6] + mu[3])*(
-        #     np.square(mu[6] + mu[3]) - (3*(np.square(mu[4] + mu[7])))
-        # )) - ((-mu[6] + (3*mu[3]))*(mu[4] + mu[6])*(
-        #     (3*(np.square(mu[6] + mu[3]))) - np.square(mu[4] + mu[7])
-        # ))
-    ])
+    hus = np.array([hu1, hu2, hu3, hu4, hu5, hu6])
 
     hu_moments = np.concatenate((hus, mu, v))
     return hu_moments
 
 
-def create_binary_images(video_path, k, sigma, start_frame, end_frame, k_size, threshold, folder):
-    image_gen = video_frame_generator(video_path)
-
-    img = image_gen.__next__()
-    img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    img = cv2.GaussianBlur(img, k, sigma)
-    h, w = img.shape
-
-    if debug:
-        if not os.path.exists(folder):
-            os.makedirs(folder)
-            os.makedirs(os.path.join(folder, "binary"))
-            os.makedirs(os.path.join(folder, "real"))
-        # outb = mp4_video_writer(os.path.join(folder, "binary.mp4"), (w, h), 40)
-        # outr = mp4_video_writer(os.path.join(folder, "real.mp4"), (w, h), 40)
-
-    num = 0
-
-    binaries = []
-    reals = []
-    K = np.ones(k_size, dtype=np.int32)
-
-    while img is not None:
-        current_img = image_gen.__next__()
-        if current_img is None:
-            break
-        current_img = cv2.cvtColor(current_img, cv2.COLOR_BGR2GRAY)
-        current_img = cv2.GaussianBlur(current_img, k, sigma)
-        current_img = cv2.morphologyEx(current_img, cv2.MORPH_OPEN, K)
-
-        if start_frame <= num <= end_frame:
-            binary = np.abs(cv2.subtract(current_img, img))
-            binary = binary.astype(np.uint8)
-
-            binaries.append(binary)
-            reals.append(current_img)
-
-            if debug:
-                cv2.imwrite(os.path.join(folder, "binary", str(num) + ".png"), binary)
-                cv2.imwrite(os.path.join(folder, "real", str(num) + ".png"), current_img)
-
-                # outb.write(binary)
-                # outr.write(current_img)
-
-        img = current_img
-        num += 1
-
-    # outb.release()
-    # outr.release()
-
-    return binaries, reals
-
-
-def create_mhi(binaries, T):
-    mhi_t = np.zeros(binaries[0].shape, dtype=np.float)
-    for binary in binaries:
-        p1 = T * (binary == 1)
-        p2 = np.subtract(mhi_t, np.ones(mhi_t.shape))
-        mhi_t = p1 + np.clip(p2, 0, 255) * (binary == 0)
-    mhi = mhi_t.astype(np.uint8)
-    return mhi
-
-
-def get_features(video_path, start_frame, end_frame, Th, T):
-    mus_mhi = []
-    vs_mhi = []
-
-    for i in range(len(start_frame)):
-        binaries, real = create_binary_images(video_path, k=(5,) * 2, sigma=0,
-                                              start_frame=start_frame[i], end_frame=end_frame[i],
-                                              k_size=(3,) * 2, threshold=Th[i], folder="test_" + str(i))
-        MHI = create_mhi(binaries, T[i])
-
-        cv2.normalize(MHI, MHI, 0.0, 255.0, cv2.NORM_MINMAX)
-        MEI = (255 * MHI > 0).astype(np.uint8)
-
-        hu_moments = create_hu_moments(MHI)
-
-        # mus_mhi.append(mu_mhi)
-        # vs_mhi.append(v_mhi)
-
-    # mus_mhi = np.array(mus_mhi).astype(np.float32)
-    # vs_mhi = np.array(vs_mhi).astype(np.float32)
-    hu_moments = np.array(hu_moments).astype(np.float32)
-
-    return hu_moments
-
-
-def create_video_output(test_video_path, output_name, actions, predictions, start_frame, end_frame, save_frames):
+def create_video_output(test_video_path, output_name, actions, predictions, save_frames):
     output_path = "./output/predicted-{}.avi".format(output_name)
 
     image_gen = video_frame_generator(test_video_path)
     img = image_gen.__next__()
     h, w, d = img.shape
-    point = (int(w / 7) - 5, int(h / 5) + 20)
+    point = (int(w / 7) - 5, int(h / 5))
 
     out = mp4_video_writer(output_path, (w, h), fps=30)
 
     frame_num = 1
     i = 0
-    start = start_frame[i]
-    end = end_frame[i]
 
     while img is not None:
 
@@ -361,13 +290,318 @@ def create_video_output(test_video_path, output_name, actions, predictions, star
         if frame_num in save_frames:
             cv2.imwrite("output-{}.png".format(str(frame_num)), img)
 
-        if frame_num == end and len(start_frame) != i + 1:
-            i += 1
-            start = start_frame[i]
-            end = end_frame[i]
-        frame_num += 1
         img = image_gen.__next__()
 
     out.release()
 
     return output_path
+
+"""
+name: get_feat_pred(prev_frame, frames, T, knn_cv)
+parameters:     prev_frame - starting frame for background subtraction
+                frames - all frames within maximum frame length for each action
+                T - tau as well as num of frames needed to predict each action
+                knn_cv - model for prediction
+algorithm:
+
+at each frame - create mhi and mei_agg
+check if it is at any tau
+    predict for hu moments at that frame
+    if prediction is the same as tau key then return tau key
+    else continue for next frame
+"""
+
+def get_feat_pred(prev_frame, frames, T, knn_cv, counter=0, g=-1):
+    # if image from previous sequence is not given take the last image of this series
+    if prev_frame is None:
+        img = frames[-1]
+    else:
+        img = prev_frame
+
+    # preprocess each frame - gray scale -> blur -> morph (dilation)
+    K = np.ones((3,3), dtype=np.int32)
+    img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    img = cv2.GaussianBlur(img, (5,5), 1)
+    img = cv2.morphologyEx(img, cv2.MORPH_OPEN, K)
+
+    # parameters
+    h, w = img.shape
+
+    # initialize mei mhi and reals
+    mei = np.zeros(img.shape, dtype=np.int32)
+    mhi = np.zeros(img.shape, dtype=np.int32)
+
+    for i, frame in enumerate(frames):
+        # at each frame - create mhi and mei_agg
+        current_img = frame
+
+        if current_img is None:
+            break
+
+        # preprocess current frame
+        current_img = cv2.cvtColor(current_img, cv2.COLOR_BGR2GRAY)
+        current_img = cv2.GaussianBlur(current_img, (5,5), 1)
+        current_img = cv2.morphologyEx(current_img, cv2.MORPH_OPEN, K)
+
+        # create diff mei image
+        binary_mei = np.zeros(img.shape, dtype=np.int32)
+        binary = np.abs(cv2.subtract(current_img, img))
+        binary_mei[binary > 14] = 1
+
+        # get mhi image
+        tau = 7
+        if counter == -1:
+            tau = T[0]
+        mhi = create_mhi_frame(binary_mei, mhi, tau)
+
+        if counter%50 == 0 or counter==-1:
+            cv2.imwrite(os.path.join(OUT_DIR, "mhi_{}.png".format(counter)), mhi*255)
+            cv2.imwrite(os.path.join(OUT_DIR, "mei_{}.png".format(counter)), mei * 255)
+
+        if g!=-1:
+            cv2.imwrite(os.path.join(OUT_DIR, "mhi_{}.png".format(g)), mhi * 255)
+            cv2.imwrite(os.path.join(OUT_DIR, "mei_{}.png".format(g)), binary_mei * 255)
+            g += 1
+
+        if counter!=-1:
+            counter += 1
+
+        mei += binary_mei
+
+        img = current_img
+
+        # check if it is at any tau
+        if i in T:
+            if np.sum(mei) == 0 or np.sum(mhi) == 0:
+                continue
+            x = create_hu_moments(mhi)
+            predict = knn_cv.predict([x])
+
+            # if prediction is the same as tau  index + 1 then return tau index + 1
+            if predict == T.index(i)+1:
+                mei[mei > 1] = 1
+                return mei, mhi, T.index(i)+1, counter
+            if counter == -1:
+                return mei, mhi, predict, counter
+
+
+    mei[mei > 1] = 1
+
+    return mei, mhi, None, counter
+
+
+def create_video_predictions(test_video_path, Th, T, knn_cv):
+    predictions = []
+    frames = []
+    cap = cv2.VideoCapture(test_video_path)
+    counter = 0
+
+    if DEBUG:
+        length = min(int(cap.get(cv2.CAP_PROP_FRAME_COUNT)), validator_video_size(test_video_path))
+        print("length: {}".format(length))
+        cap.release()
+
+    image_gen = video_frame_generator(test_video_path)
+
+    maxT = max(T)
+
+    prev_frame = image_gen.__next__()
+
+    for i in range(maxT):
+        frames.append(image_gen.__next__())
+
+    video_complete = False
+    while len(frames) > 0:
+        # get mhi and mei and possible prediction
+        mei, mhi, prediction, counter = get_feat_pred(prev_frame, frames, T, knn_cv, counter=counter)
+
+        # if mhi is non zero
+        if np.sum(mhi) > 0:
+            # if possible prediction is not None
+            if prediction is not None:
+                # append possible prediction to label and get value of tau
+                num_frames = T[prediction - 1]
+                # put the action label in the frames
+                for i in range(num_frames):
+                    predictions.append(prediction)
+                #  remove the frames to be processed
+                prev_frame = frames[num_frames - 1]
+                frames = frames[num_frames:]
+
+            # else:
+            else:
+                # get hu moments of mhi
+                x = create_hu_moments(mhi)
+                # predict X
+                prediction = knn_cv.predict([x])[0]
+                # append it to list of predictions so far
+                # predictions.append(prediction)
+                # if total number of predictions is less than 11
+                # or 8/10 of last 10 predictions is the same as predicted then there is no need to do anything
+                # else get max bincount prediction and append it
+                predictions.append(prediction)
+                arr = predictions[-10:]
+                if not (len(predictions) <= 11 or np.sum(np.array(arr) == prediction) > 8):
+                    prediction = np.bincount(np.array(arr)).argmax()
+                for frame in frames[:-1]:
+                    predictions.append(prediction)
+                prev_frame = frames[-1]
+                frames = []
+        # else:
+        #     there was no prediction for this frame
+        #     start with the next frame
+        else:
+            predictions.append(0)
+            prev_frame = frames[0]
+            frames = frames[1:]
+        while len(frames) <= maxT:
+            frame = image_gen.__next__()
+            if frame is None:
+                pred = predictions[-1]
+                for fr in frames:
+                    predictions.append(pred)
+                video_complete = True
+                break
+            frames.append(frame)
+        if video_complete == True:
+            break
+
+    return predictions
+
+def get_predictions(test_video_path, Th, T, knn_cv):
+    predictions = []
+    frames = []
+    cap = cv2.VideoCapture(test_video_path)
+
+    length = min(int(cap.get(cv2.CAP_PROP_FRAME_COUNT)), validator_video_size(test_video_path))
+    cap.release()
+
+    if DEBUG:
+        print("length: {}".format(length))
+
+    image_gen = video_frame_generator(test_video_path)
+
+    maxT = max(T)
+
+    prev_frame = image_gen.__next__()
+
+    for i in range(length):
+        frames.append(image_gen.__next__())
+
+    preds = []
+    for t in T:
+        g=0
+        act_pred = []
+        loops = int(length/t)
+        prev_loop_frame = prev_frame
+        for loop in range(loops):
+            mei, mhi, predict, _ = get_feat_pred(prev_loop_frame, frames[loop:t+loop+1], [t], knn_cv, counter=-1,g=g)
+            g += t
+            prev_loop_frame = frames[t+loop]
+            if isinstance(predict, list) or isinstance(predict, np.ndarray):
+                predict = predict[0]
+            if predict is None:
+                predict = 0
+            act_pred.extend([predict]*t)
+        if len(act_pred) != length:
+            act_pred.extend([predict]*(length-len(act_pred)))
+        preds.append(act_pred)
+
+    preds = np.array(preds, dtype=np.int32)
+    print(preds)
+
+    for i in range(preds.shape[0]):
+        unique, counts = np.unique(preds[i], return_counts=True)
+        print(dict(zip(unique, counts)))
+
+    for i in range(length):
+        predictions.append(int(np.bincount(preds[:,i]).argmax()))
+
+    return predictions
+
+# def create_binary_images(video_path, k, sigma, start_frame, end_frame, k_size, threshold, folder):
+#     image_gen = video_frame_generator(video_path)
+#
+#     img = image_gen.__next__()
+#     img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+#     img = cv2.GaussianBlur(img, k, sigma)
+#     h, w = img.shape
+#
+#     if DEBUG:
+#         if not os.path.exists(folder):
+#             os.makedirs(folder)
+#             os.makedirs(os.path.join(folder, "binary"))
+#             os.makedirs(os.path.join(folder, "real"))
+#         # outb = mp4_video_writer(os.path.join(folder, "binary.mp4"), (w, h), 40)
+#         # outr = mp4_video_writer(os.path.join(folder, "real.mp4"), (w, h), 40)
+#
+#     num = 0
+#
+#     binaries = []
+#     reals = []
+#     K = np.ones(k_size, dtype=np.int32)
+#
+#     while img is not None:
+#         current_img = image_gen.__next__()
+#         if current_img is None:
+#             break
+#         current_img = cv2.cvtColor(current_img, cv2.COLOR_BGR2GRAY)
+#         current_img = cv2.GaussianBlur(current_img, k, sigma)
+#         current_img = cv2.morphologyEx(current_img, cv2.MORPH_OPEN, K)
+#
+#         if start_frame <= num <= end_frame:
+#             binary = np.abs(cv2.subtract(current_img, img))
+#             binary = binary.astype(np.uint8)
+#
+#             binaries.append(binary)
+#             reals.append(current_img)
+#
+#             if DEBUG:
+#                 cv2.imwrite(os.path.join(folder, "binary", str(num) + ".png"), binary)
+#                 cv2.imwrite(os.path.join(folder, "real", str(num) + ".png"), current_img)
+#
+#                 # outb.write(binary)
+#                 # outr.write(current_img)
+#
+#         img = current_img
+#         num += 1
+#
+#     # outb.release()
+#     # outr.release()
+#
+#     return binaries, reals
+
+
+# def create_mhi(binaries, T):
+#     mhi_t = np.zeros(binaries[0].shape, dtype=np.float)
+#     for binary in binaries:
+#         p1 = T * (binary == 1)
+#         p2 = np.subtract(mhi_t, np.ones(mhi_t.shape))
+#         mhi_t = p1 + np.clip(p2, 0, 255) * (binary == 0)
+#     mhi = mhi_t.astype(np.uint8)
+#     return mhi
+
+
+# def get_features(video_path, start_frame, end_frame, Th, T):
+#     mus_mhi = []
+#     vs_mhi = []
+#
+#     for i in range(len(start_frame)):
+#         binaries, real = create_binary_images(video_path, k=(5,) * 2, sigma=0,
+#                                               start_frame=start_frame[i], end_frame=end_frame[i],
+#                                               k_size=(3,) * 2, threshold=Th[i], folder="test_" + str(i))
+#         MHI = create_mhi(binaries, T[i])
+#
+#         cv2.normalize(MHI, MHI, 0.0, 255.0, cv2.NORM_MINMAX)
+#         MEI = (255 * MHI > 0).astype(np.uint8)
+#
+#         hu_moments = create_hu_moments(MHI)
+#
+#         # mus_mhi.append(mu_mhi)
+#         # vs_mhi.append(v_mhi)
+#
+#     # mus_mhi = np.array(mus_mhi).astype(np.float32)
+#     # vs_mhi = np.array(vs_mhi).astype(np.float32)
+#     hu_moments = np.array(hu_moments).astype(np.float32)
+#
+#     return hu_moments
