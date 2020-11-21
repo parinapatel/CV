@@ -283,7 +283,7 @@ def create_video_output(test_video_path, output_name, actions, predictions, save
 
     while img is not None:
 
-        cv2.putText(img, "(predicted: {})".format(actions[predictions[i]]), point, cv2.FONT_HERSHEY_DUPLEX, 2.5,
+        cv2.putText(img, "[{}]".format(actions[predictions[i]]), point, cv2.FONT_HERSHEY_DUPLEX, 0.75,
                     (255, 0, 0), 1)
         out.write(img)
 
@@ -317,11 +317,13 @@ def get_feat_pred(prev_frame, frames, T, knn_cv, counter=0, g=-1):
         img = frames[-1]
     else:
         img = prev_frame
-
+    k_size = (3,3)
+    k = (5,5)
+    sigma = 1
     # preprocess each frame - gray scale -> blur -> morph (dilation)
-    K = np.ones((3,3), dtype=np.int32)
+    K = np.ones(k_size, dtype=np.int32)
     img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    img = cv2.GaussianBlur(img, (5,5), 1)
+    img = cv2.GaussianBlur(img, k, sigma)
     img = cv2.morphologyEx(img, cv2.MORPH_OPEN, K)
 
     # parameters
@@ -340,7 +342,7 @@ def get_feat_pred(prev_frame, frames, T, knn_cv, counter=0, g=-1):
 
         # preprocess current frame
         current_img = cv2.cvtColor(current_img, cv2.COLOR_BGR2GRAY)
-        current_img = cv2.GaussianBlur(current_img, (5,5), 1)
+        current_img = cv2.GaussianBlur(current_img, k, sigma)
         current_img = cv2.morphologyEx(current_img, cv2.MORPH_OPEN, K)
 
         # create diff mei image
@@ -508,15 +510,26 @@ def get_predictions(test_video_path, Th, T, knn_cv):
         preds.append(act_pred)
 
     preds = np.array(preds, dtype=np.int32)
-    print(preds)
 
-    for i in range(preds.shape[0]):
-        unique, counts = np.unique(preds[i], return_counts=True)
-        print(dict(zip(unique, counts)))
+    unique, counts = np.unique(preds, return_counts=True)
+    c = dict(zip(unique, counts))
+    print(c)
+
+    total = 0
+    for count in counts:
+        total += count
+
+    actions=[0]*7
+    for k in c.keys():
+        actions[k] = float(c[k])/total
+        print("k: {}, v: {}".format(k, float(c[k])/total))
+
+    act = np.argmax(np.array(actions))
+
 
     for i in range(length):
-        predictions.append(int(np.bincount(preds[:,i]).argmax()))
-
+        # predictions.append(int(np.bincount(preds[:,i]).argmax()))
+        predictions.append(act)
     return predictions
 
 # def create_binary_images(video_path, k, sigma, start_frame, end_frame, k_size, threshold, folder):

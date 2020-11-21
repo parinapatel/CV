@@ -18,9 +18,9 @@ actions = [('boxing', 1), ('handclapping', 2), ('handwaving', 3), ('jogging', 4)
 # Th needs to be chosen for each action
 Th = [14,14,14,14,14,14]
 # T needs to be chosen and differs with actions
-# T = [7,13,17,21,11,35]
+T = [7,13,17,21,11,35]
 split_percent = 0.8
-T = [7,14,14,21,14,21]
+# T = [7,14,14,21,14,21]
 
 data_folder = "Data NPY cv2"
 fields = ["Xtrain", "ytrain", "Xtest", "ytest"]
@@ -84,11 +84,10 @@ for act, i in actions:
 
     # predictions = util.create_video_predictions(test_video_path, Th, T, knn_cv)
     predictions = util.get_predictions(test_video_path, Th, T, knn_cv)
-    print(np.bincount(np.array(predictions)))
     print(set(predictions))
 
     action = ["None","boxing","handclapping","handwaving","jogging","running","walking"]
-    output_path = util.create_video_output(test_video_path, "pred", action, predictions, [])
+    output_path = util.create_video_output(test_video_path, "pred_{}".format(act), action, predictions, [])
 
 # v = util.get_features(test_video_path, start_frame, end_frame, Th, T)
 # if debug:
