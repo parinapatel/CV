@@ -1,0 +1,31 @@
+use median filtering for extracting the background
+
+create a function to get hu moments from video portions
+
+create a function to build the entire dataset with mus and vs and then store it in numpy array
+
+
+Hve used 7 hu moments instead of 6
+-use  blurring (5,5) sigma 0 and (3,3) for morphing when creating images for showing - DONE --> GENERATED MEI AND MHI for training ones
+-otherwise use (13,13) and (9,9) with sigma 1
+
+
+
+
+1. Build Dataset
+2. Save it as numpy
+3. Load from numpy
+4. create KNN
+5. train model
+    -> Here I am just using scale invariant features - v
+6. create features from test video
+7. test model
+8. create output video
+9. create confusion matrix
+"""
+
+put it in chunks of 7 frames each
+and get predictions for 7 - 7 frames at a time
+for frame 1 - argmax of first 7
+
+last 6 frames have the same as the 7th last frame
