@@ -1,104 +1,185 @@
-import cv2
 import numpy as np
 import os
-import matplotlib.pyplot
+import matplotlib.pyplot as plt
 import util
+import logging
 from sklearn.neighbors import KNeighborsClassifier
-from sklearn.model_selection import cross_val_score
 from sklearn.metrics import confusion_matrix
+from sklearn.metrics import plot_confusion_matrix
+from datetime import datetime
+from pathlib import Path
 
-IN_DIR = "input_videos"
-OUT_DIR = "output"
+try:
+    from joblib import dump as dump
+    from joblib import load as load
+except ImportError:
+    from pickle import load as load
+    from pickle import dump as dump
 
-# Build dataset using MHIs and MEIs
+logging.basicConfig(format='%(asctime)s\t%(levelname)s\t"%(message)s"', level=logging.DEBUG)
 
-"""
-key 
-name
-videos
-    Key
-    filename
-    frames list
-"""
 
-info = [
-    ("boxing", "  ", [])
-]
-actions = [('boxing', 1), ('handclapping', 2), ('handwaving', 3), ('jogging', 4), ('running', 5), ('walking', 6)]
+class MHI_train(object):
+    def __init__(self, dataset_dir="", log_level=logging.INFO, **kwargs):
+        self.actions = [
+            ('boxing', 1),
+            ('handclapping', 2),
+            ('handwaving', 3),
+            ('jogging', 4),
+            ('running', 5),
+            ('walking', 6)
+        ]
+        # Th needs to be chosen for each action
+        self.Th = [14, 14, 14, 14, 14, 14]
+        # T needs to be chosen and differs with actions
+        self.T = [7, 13, 17, 21, 11, 35]
+        self.split_percent = 0.8
+        # self.data_folder = "Data NPY cv2"
+        self.fields = ["Xtrain", "ytrain", "Xtest", "ytest"]
+        self.dataset_dir = dataset_dir or "training_dataset"
 
-frames = {'boxing': [(0, 36), (36, 72), (72, 108)],
-          'handclapping': [(0, 27), (27, 54), (54, 81)],
-          'handwaving': [(0, 48), (48, 96), (96, 144)],
-          'jogging': [(15, 70), (145, 200), (245, 300)],
-          'running': [(15, 37), (114, 137), (192, 216)],
-          'walking': [(18, 88), (242, 320), (441, 511)]}
+    def create_dataset(self, ):
+        """
+        Build dataset using MHIs and MEIs and saves to directory
+        Returns: None
 
-# Th needs to be chosen for each action
-Th = [1, 8, 10, 40, 5, 5]
+        """
+        logging.debug("Building dataset.")
+        data = util.build_entire_dataset(self.actions, self.Th, self.T, self.split_percent)
+        logging.debug("Build dataset done.")
+        if not Path(self.dataset_dir).exists():
+            os.makedirs(self.dataset_dir)
+        for i, filename in enumerate(self.fields):
+            logging.debug("Writing {}th data to file {}".format
+                          (i, Path(self.dataset_dir, filename + ".npy")))
+            np.save(Path(".").joinpath(self.dataset_dir, filename + ".npy"), data[i])
+        logging.info("Save it as Numpy done")
 
-# T needs to be chosen and differs with actions
-T = [50, 30, 50, 50, 30, 10]
+    def __load_dataset(self) -> list:
+        data_loaded = []
+        logging.info("loading data from {}".format(self.dataset_dir))
+        for field in self.fields:
+            logging.debug("loading data field {} from {}".format(field, Path(self.dataset_dir, field + ".npy")))
+            data_loaded.append(np.load(Path(self.dataset_dir, field + ".npy")))
+        logging.info("loading data done.")
+        return data_loaded
 
-# create all the action MHI, MEI, and labels
-def build_dataset(actions, frames):
-    MHIs = []
-    MEIs = []
-    mus_mhi = []  # central moments
-    vs_mhi = []  # scale invariant moments
-    mus_mei = []  # central moments
-    vs_mei = []  # scale invariant moments
+    # reference https://towardsdatascience.com/building-a-k-nearest-neighbors-k-nn-model-with-scikit-learn-51209555453a
+    def generate_KNN(self) -> KNeighborsClassifier:
+        """
 
-    labels = []
+        Args:
+            dataset_dir:
 
-    for i, action in enumerate(actions):
-        act = action[0]
-        num = action[1]
-        frames_act = frames[act]
-        for j, t in enumerate(frames_act):
-            start_t = t[0]
-            end_t = t[1]
-            duration = end_t - start_t
-            file = 'person15_' + str(act) + '_d1_uncomp.avi'
-            path = os.path.join(IN_DIR, file)
+        Returns: Knn classifier , Classifier implementing the k-nearest neighbors vote.
 
-            binaries, real = util.create_binary_images(path, k=(5,) * 2, sigma=0,
-                                                       start_frame=start_t, end_frame=end_t,
-                                                       k_size=(3,) * 2, threshold=Th[i], folder=act + "_" + str(j))
 
-            MHI = util.create_mhi(binaries, T[i])
+        """
+        data = self.__load_dataset()
+        Xtrain, ytrain, Xtest, ytest = data[0], data[1], data[2], data[3]
+        logging.info("Creating KNN from {}".format(self.dataset_dir))
+        knn_cv = KNeighborsClassifier(n_neighbors=5)
+        logging.debug("Fit the model using Xtrain as training data and ytrain as target values")
+        knn_cv.fit(Xtrain, ytrain)
+        logging.info("Training KNN Done.")
+        return knn_cv
 
-            cv2.normalize(MHI, MHI, 0.0, 255.0, cv2.NORM_MINMAX)
-            MEI = (255 * MHI > 0).astype(np.uint8)
+    def predict_test_accuracy(self, knn_classifer: KNeighborsClassifier) -> np.ndarray:
+        logging.info("Validating Trained model accuracy.")
+        data = self.__load_dataset()
+        Xtest, ytest = data[2], data[3]
+        del data
+        ypredict = knn_classifer.predict(Xtest)
+        accuracy = 100 * (np.sum([1 if ytest[i] == ypredict[i] else 0 for i in range(len(ytest))])) / (
+            ypredict.shape[0])
+        logging.warning("Model training Accuracy: {} %".format(accuracy))
+        return ypredict
 
-            mu_mhi, v_mhi = util.create_hu_moments(MHI)
-            mu_mei, v_mei = util.create_hu_moments(MEI)
+    def confusion_matrix(self, ypredict: np.ndarray, knn_classifier: KNeighborsClassifier) -> None:
+        logging.info("Validating Trained model accuracy.")
+        data = self.__load_dataset()
+        Xtest, ytest = data[2], data[3]
+        del data
+        logging.debug("create confusion matrix")
+        cnf_mtx = confusion_matrix(ytest, ypredict, normalize="true")
+        logging.info("Confusion Matrix: {}".format(cnf_mtx))
+        logging.debug("Plotting confusion matrix.")
+        disp = plot_confusion_matrix(knn_classifier, Xtest, ytest, cmap=plt.cm.Blues, normalize='true')
+        disp.ax_.set_title("confusion matrix")
+        plt.savefig("confusion matrix.png", bbox_inches="tight")
 
-            MHIs.append(MHI)
-            MEIs.append(MEI)
+    @staticmethod
+    def store_classifier(knn_classifier: KNeighborsClassifier, output_pickle_file: str):
+        logging.info("Dumping Classifer at {}".format(output_pickle_file))
+        with open(output_pickle_file, 'wb') as file:
+            dump(knn_classifier, file)
+        logging.debug("Dumped Classifier.")
 
-            mus_mhi.append(mu_mhi)
-            vs_mhi.append(v_mhi)
-            mus_mei.append(mu_mei)
-            vs_mei.append(v_mei)
+    @staticmethod
+    def load_classifier(input_pickle_file: str) -> KNeighborsClassifier:
+        logging.info("Loading Classifer from {}".format(input_pickle_file))
+        if input_pickle_file == "" or Path(input_pickle_file).is_file():
+            logging.error("Model file is not present.")
+        else:
+            try:
+                with open(input_pickle_file, 'rb') as file:
+                    data = load(file)
+                logging.info("model Loaded")
+                return data
+            except Exception as e:
+                logging.exception("model corrupted.")
 
-            labels.append(num)
 
-    labels = np.array(labels).astype(np.int)
-    mus_mhi = np.array(mus_mhi).astype(np.float32)
-    vs_mhi = np.array(vs_mhi).astype(np.float32)
-    mus_mei = np.array(mus_mei).astype(np.float32)
-    vs_mei = np.array(vs_mei).astype(np.float32)
+class video_predictor(object):
+    def __init__(self, model_location=""):
+        if model_location == "" or not Path(model_location).is_file():
+            logging.error("Model file is not present.")
+        else:
+            try:
+                with open(model_location, 'rb') as f:
+                    self.classifier = load(f)
+            except Exception as e:
+                logging.exception("model corrupted.",stack_info=True)
+                exit(1)
+        # Th needs to be chosen for each action
+        self.Th = [14, 14, 14, 14, 14, 14]
+        # T needs to be chosen and differs with actions
+        self.T = [7, 13, 17, 21, 11, 35]
 
-    return labels, MHIs, MEIs, mus_mhi, vs_mhi, mus_mei, vs_mei
+        self.actions = [
+            ('boxing', 1),
+            ('handclapping', 2),
+            ('handwaving', 3),
+            ('jogging', 4),
+            ('running', 5),
+            ('walking', 6)
+        ]
 
-labels, MHIs, MEIs, mus_mhi, vs_mhi, mus_mei, vs_mei = build_dataset(actions, frames)
+    def predict(self, test_video_path,output_file_name):
 
-knn_cv = KNeighborsClassifier(n_neighbors=3)
+        if output_file_name.endswith(".avi"):
+            output_file_name = output_file_name[:-4]
 
-# knn_cv.fit(vs_mhi, labels)
-#train model with cv of 5
-print(labels.shape)
-cv_scores = cross_val_score(knn_cv, vs_mhi, labels, cv=3)
-#print each cv score (accuracy) and average them
-print(cv_scores)
-print("cv_scores mean:{}".format(np.mean(cv_scores)))
+        predictions = util.get_predictions(test_video_path, self.Th, self.T, self.classifier)
+        logging.info(set(predictions))
+        pred_action = ["None", "boxing", "handclapping", "handwaving", "jogging", "running", "walking"]
+        util.create_video_output(test_video_path, output_file_name, pred_action, predictions, [])
+
+
+if __name__ == '__main__':
+    pikle_file = "knn_trained_model.pkl"
+    train_model = False
+    input_file='./Data MHI/boxing/person12_boxing_d1_uncomp.avi'
+    output_name = "parin_test"
+
+    if train_model:
+        mhi = MHI_train(dataset_dir="Training Dataset")
+        mhi.create_dataset()
+        knn = mhi.generate_KNN()
+        ypredict = mhi.predict_test_accuracy(knn)
+        mhi.confusion_matrix(ypredict, knn)
+        mhi.store_classifier(knn, pikle_file)
+
+    v_predictor = video_predictor(pikle_file)
+    v_predictor.predict(input_file,output_file_name=output_name)
+
